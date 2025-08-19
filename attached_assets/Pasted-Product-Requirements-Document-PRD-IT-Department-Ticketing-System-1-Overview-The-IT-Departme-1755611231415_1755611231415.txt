@@ -1,0 +1,93 @@
+Product Requirements Document (PRD)
+
+IT Department Ticketing System
+
+⸻
+
+1. Overview
+
+The IT Department Ticketing System is designed to streamline the process of reporting, tracking, and resolving IT-related issues within an organization. The system will centralize requests, automate ticket assignment, improve communication between staff and IT, and provide reporting for performance analysis.
+
+⸻
+
+2. Objectives
+	•	Provide a centralized platform for IT support requests.
+	•	Ensure efficient tracking and resolution of IT issues.
+	•	Improve IT team productivity through automation and prioritization.
+	•	Enhance user experience with a simple and intuitive interface.
+	•	Provide visibility into IT operations with real-time dashboards and reports.
+
+⸻
+
+3. Stakeholders
+	•	End Users (Employees): Create tickets for IT support.
+	•	IT Support Staff (Tier I, II, III): Manage, resolve, and close tickets.
+	•	IT Managers: Monitor team performance, generate reports, and ensure SLAs are met.
+	•	System Admin: Configure and maintain the system.
+
+⸻
+
+4. Scope
+
+In-Scope Features
+	•	Ticket creation and tracking.
+	•	Ticket categorization (hardware, software, network, access, other).
+	•	Priority levels (low, medium, high, critical).
+	•	SLA tracking with automated escalation.
+	•	Role-based access (End user, IT support, Manager).
+	•	Email and in-app notifications.
+	•	Dashboard for IT staff and managers.
+	•	Knowledge base for common issues.
+	•	Reporting and analytics.
+
+Out-of-Scope (for initial release)
+	•	Integration with third-party systems (e.g., Slack, Teams, Jira).
+	•	Mobile app (desktop-first design).
+	•	AI-based auto-ticket classification (can be a future enhancement).
+
+⸻
+
+5. Functional Requirements
+
+5.1 Ticket Management
+	•	Users can create tickets with title, description, category, priority, and attachments.
+	•	IT staff can assign, reassign, and update ticket statuses.
+	•	Ticket statuses: New, In Progress, Pending, Resolved, Closed.
+	•	SLA rules trigger reminders or escalations when deadlines approach.
+
+5.2 User Roles & Permissions
+	•	End User: Create/view/update their tickets, access knowledge base.
+	•	IT Staff: Manage tickets, add internal notes, communicate with users.
+	•	Manager: Monitor ticket queues, reassign workload, view reports.
+	•	Admin: Configure categories, SLAs, users, permissions.
+
+5.3 Notifications
+	•	Email/in-app notifications for ticket creation, updates, and resolution.
+	•	Reminders for SLA deadlines.
+	•	Escalation alerts to managers for overdue tickets.
+
+5.4 Reporting & Analytics
+	•	Reports on ticket volume, resolution time, SLA compliance, workload distribution.
+	•	Export to CSV/PDF.
+	•	Dashboards with filters by department, priority, and category.
+
+5.5 Knowledge Base
+	•	Common issues and troubleshooting guides.
+	•	Searchable articles linked to ticket categories.
+
+⸻
+
+6. Non-Functional Requirements
+	•	Usability: Clean, intuitive UI accessible by all staff levels.
+	•	Performance: Ticket creation <2 seconds, dashboard load <5 seconds.
+	•	Scalability: Support 500+ users and 10,000+ tickets annually.
+	•	Security: Role-based access, encrypted data storage, secure login.
+	•	Availability: 99.9% uptime.
+
+⸻
+
+7. Success Metrics
+	•	90% of tickets resolved within SLA.
+	•	30% reduction in average resolution time.
+	•	At least 70% of end users actively using the system after 3 months.
+	•	Improved IT team satisfaction (measured via internal survey).
