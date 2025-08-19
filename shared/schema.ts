@@ -1,0 +1,195 @@
+import { sql } from 'drizzle-orm';
+import {
+  index,
+  jsonb,
+  pgTable,
+  timestamp,
+  varchar,
+  text,
+  integer,
+  pgEnum,
+} from "drizzle-orm/pg-core";
+import { relations } from 'drizzle-orm';
+import { createInsertSchema } from 'drizzle-zod';
+import { z } from 'zod';
+
+// Session storage table (required for Replit Auth)
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// User roles enum
+export const userRoleEnum = pgEnum('user_role', ['end_user', 'it_staff', 'manager', 'admin']);
+
+// Ticket categories enum
+export const ticketCategoryEnum = pgEnum('ticket_category', ['hardware', 'software', 'network', 'access', 'other']);
+
+// Ticket priorities enum
+export const ticketPriorityEnum = pgEnum('ticket_priority', ['low', 'medium', 'high', 'critical']);
+
+// Ticket statuses enum
+export const ticketStatusEnum = pgEnum('ticket_status', ['new', 'in_progress', 'pending', 'resolved', 'closed']);
+
+// User storage table (required for Replit Auth)
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  role: userRoleEnum('role').default('end_user').notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Tickets table
+export const tickets = pgTable("tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  category: ticketCategoryEnum('category').notNull(),
+  priority: ticketPriorityEnum('priority').notNull(),
+  status: ticketStatusEnum('status').default('new').notNull(),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  assignedToId: varchar("assigned_to_id").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Ticket comments table
+export const ticketComments = pgTable("ticket_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: varchar("ticket_id").notNull().references(() => tickets.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  isInternal: integer("is_internal").default(0).notNull(), // 0 = public, 1 = internal note
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Knowledge base articles table
+export const knowledgeArticles = pgTable("knowledge_articles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  category: ticketCategoryEnum('category').notNull(),
+  tags: text("tags").array(),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Ticket attachments table
+export const ticketAttachments = pgTable("ticket_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: varchar("ticket_id").notNull().references(() => tickets.id, { onDelete: 'cascade' }),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  filePath: varchar("file_path", { length: 500 }).notNull(),
+  fileSize: integer("file_size").notNull(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  uploadedById: varchar("uploaded_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  createdTickets: many(tickets, { relationName: "createdTickets" }),
+  assignedTickets: many(tickets, { relationName: "assignedTickets" }),
+  comments: many(ticketComments),
+  knowledgeArticles: many(knowledgeArticles),
+  attachments: many(ticketAttachments),
+}));
+
+export const ticketsRelations = relations(tickets, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [tickets.createdById],
+    references: [users.id],
+    relationName: "createdTickets",
+  }),
+  assignedTo: one(users, {
+    fields: [tickets.assignedToId],
+    references: [users.id],
+    relationName: "assignedTickets",
+  }),
+  comments: many(ticketComments),
+  attachments: many(ticketAttachments),
+}));
+
+export const ticketCommentsRelations = relations(ticketComments, ({ one }) => ({
+  ticket: one(tickets, {
+    fields: [ticketComments.ticketId],
+    references: [tickets.id],
+  }),
+  user: one(users, {
+    fields: [ticketComments.userId],
+    references: [users.id],
+  }),
+}));
+
+export const knowledgeArticlesRelations = relations(knowledgeArticles, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [knowledgeArticles.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const ticketAttachmentsRelations = relations(ticketAttachments, ({ one }) => ({
+  ticket: one(tickets, {
+    fields: [ticketAttachments.ticketId],
+    references: [tickets.id],
+  }),
+  uploadedBy: one(users, {
+    fields: [ticketAttachments.uploadedById],
+    references: [users.id],
+  }),
+}));
+
+// Insert schemas
+export const insertTicketSchema = createInsertSchema(tickets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  resolvedAt: true,
+});
+
+export const insertCommentSchema = createInsertSchema(ticketComments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertKnowledgeArticleSchema = createInsertSchema(knowledgeArticles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAttachmentSchema = createInsertSchema(ticketAttachments).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Types
+export type UpsertUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type InsertTicket = z.infer<typeof insertTicketSchema>;
+export type Ticket = typeof tickets.$inferSelect;
+export type InsertComment = z.infer<typeof insertCommentSchema>;
+export type TicketComment = typeof ticketComments.$inferSelect;
+export type InsertKnowledgeArticle = z.infer<typeof insertKnowledgeArticleSchema>;
+export type KnowledgeArticle = typeof knowledgeArticles.$inferSelect;
+export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
+export type TicketAttachment = typeof ticketAttachments.$inferSelect;
+
+// Ticket with relations type
+export type TicketWithRelations = Ticket & {
+  createdBy: User;
+  assignedTo?: User | null;
+  comments: (TicketComment & { user: User })[];
+  attachments: (TicketAttachment & { uploadedBy: User })[];
+};
