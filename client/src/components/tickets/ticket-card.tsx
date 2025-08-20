@@ -1,8 +1,9 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ClockIcon, UserIcon, CalendarIcon } from "lucide-react";
+import { ClockIcon, UserIcon, CalendarIcon, TrashIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "wouter";
 
 interface TicketCardProps {
   ticket: {
@@ -19,15 +20,27 @@ interface TicketCardProps {
       email?: string;
     } | null;
     createdBy: {
+      id: string;
       firstName?: string;
       lastName?: string;
       email?: string;
     };
   };
   showDetails?: boolean;
+  currentUserId?: string;
+  onDelete?: (ticketId: string) => void;
+  isDeleting?: boolean;
 }
 
-export default function TicketCard({ ticket, showDetails = false }: TicketCardProps) {
+export default function TicketCard({ 
+  ticket, 
+  showDetails = false, 
+  currentUserId,
+  onDelete,
+  isDeleting = false
+}: TicketCardProps) {
+  const canDelete = currentUserId && ticket.createdBy?.id === currentUserId && ticket.status === 'new';
+
   const getPriorityColor = (priority: string) => {
     const colors = {
       low: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
@@ -81,6 +94,12 @@ export default function TicketCard({ ticket, showDetails = false }: TicketCardPr
     return "Unknown User";
   };
 
+  const handleDelete = () => {
+    if (onDelete && confirm(`Are you sure you want to delete the ticket "${ticket.title}"? This action cannot be undone.`)) {
+      onDelete(ticket.id);
+    }
+  };
+
   return (
     <Card className="hover:shadow-md transition-shadow" data-testid={`card-ticket-${ticket.id}`}>
       <CardContent className="p-4">
@@ -96,9 +115,23 @@ export default function TicketCard({ ticket, showDetails = false }: TicketCardPr
               <h3 className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1">
                 {ticket.title}
               </h3>
-              <Badge className={getStatusColor(ticket.status)}>
-                {getStatusDisplay(ticket.status)}
-              </Badge>
+              <div className="flex items-center space-x-2">
+                <Badge className={getStatusColor(ticket.status)}>
+                  {getStatusDisplay(ticket.status)}
+                </Badge>
+                {canDelete && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    data-testid={`button-delete-ticket-${ticket.id}`}
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
             </div>
             
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
@@ -126,9 +159,11 @@ export default function TicketCard({ ticket, showDetails = false }: TicketCardPr
 
             {showDetails && (
               <div className="mt-3 flex items-center space-x-2">
-                <Button size="sm" variant="outline" data-testid={`button-view-ticket-${ticket.id}`}>
-                  View Details
-                </Button>
+                <Link href={`/ticket/${ticket.id}`}>
+                  <Button size="sm" variant="outline" data-testid={`button-view-ticket-${ticket.id}`}>
+                    View Details
+                  </Button>
+                </Link>
                 {ticket.status !== 'resolved' && ticket.status !== 'closed' && (
                   <Button size="sm" variant="ghost" data-testid={`button-update-ticket-${ticket.id}`}>
                     Update Status

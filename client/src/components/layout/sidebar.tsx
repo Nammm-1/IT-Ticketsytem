@@ -87,19 +87,24 @@ export default function Sidebar() {
             </Button>
           </Link>
           
-          <Link href="/create-ticket">
-            <Button
-              variant="ghost"
-              className={cn(
-                "w-full justify-start",
-                isActive("/create-ticket") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
-              )}
-              data-testid="nav-create-ticket"
-            >
-              <PlusCircleIcon className="w-5 h-5 mr-3" />
-              Create Ticket
-            </Button>
-          </Link>
+          {/* Only show Create Ticket for non-admin users */}
+          {user?.role && user.role !== 'admin' && (
+            <Link href="/create-ticket">
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/create-ticket") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
+                )}
+                data-testid="nav-create-ticket"
+              >
+                <PlusCircleIcon className="w-5 h-5 mr-3" />
+                Create Ticket
+              </Button>
+            </Link>
+          )}
+          
+
           
           <Link href="/tickets">
             <Button
@@ -130,14 +135,19 @@ export default function Sidebar() {
           </Link>
 
           {user?.role && ['it_staff', 'manager', 'admin'].includes(user.role) && (
-            <Button
-              variant="ghost"
-              className="w-full justify-start"
-              data-testid="nav-reports"
-            >
-              <BarChart3Icon className="w-5 h-5 mr-3" />
-              Reports
-            </Button>
+            <Link href="/reports">
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full justify-start",
+                  isActive("/reports") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
+                )}
+                data-testid="nav-reports"
+              >
+                <BarChart3Icon className="w-5 h-5 mr-3" />
+                Reports
+              </Button>
+            </Link>
           )}
         </div>
 
@@ -148,22 +158,65 @@ export default function Sidebar() {
               IT Staff Tools
             </h3>
             <div className="space-y-2">
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                data-testid="nav-ticket-queue"
-              >
-                <InboxIcon className="w-5 h-5 mr-3" />
-                Ticket Queue
-              </Button>
+              <Link href="/ticket-queue">
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-start",
+                    isActive("/ticket-queue") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
+                  )}
+                  data-testid="nav-ticket-queue"
+                >
+                  <InboxIcon className="w-5 h-5 mr-3" />
+                  Ticket Queue
+                </Button>
+              </Link>
+              
+              <Link href="/team-workload">
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-start",
+                    isActive("/team-workload") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
+                  )}
+                  data-testid="nav-team-workload"
+                >
+                  <UsersIcon className="w-5 h-5 mr-3" />
+                  Team Workload
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Admin Tools */}
+        {user?.role === 'admin' && (
+          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <h3 className="px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+              Admin Tools
+            </h3>
+            <div className="space-y-2">
+                             <Link href="/user-management">
+                 <Button
+                   variant="ghost"
+                   className={cn(
+                     "w-full justify-start",
+                     isActive("/user-management") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
+                   )}
+                   data-testid="nav-user-management"
+                 >
+                   <UsersIcon className="w-5 h-5 mr-3" />
+                   View All Users
+                 </Button>
+               </Link>
               
               <Button
                 variant="ghost"
                 className="w-full justify-start"
-                data-testid="nav-team-workload"
+                data-testid="nav-system-settings"
               >
-                <UsersIcon className="w-5 h-5 mr-3" />
-                Team Workload
+                <SettingsIcon className="w-5 h-5 mr-3" />
+                System Settings
               </Button>
             </div>
           </div>
@@ -174,7 +227,7 @@ export default function Sidebar() {
       <div className="absolute bottom-4 left-4 right-4">
         <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
           <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-sm font-medium">
+            <span className="text-foreground text-sm font-medium">
               {getInitials(user)}
             </span>
           </div>

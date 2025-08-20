@@ -23,6 +23,8 @@ export interface IStorage {
   // User operations (mandatory for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<UpsertUser>): Promise<User>;
+  createUser(user: UpsertUser): Promise<User>;
   
   // Ticket operations
   createTicket(ticket: InsertTicket): Promise<Ticket>;
@@ -38,6 +40,7 @@ export interface IStorage {
     offset?: number;
   }): Promise<TicketWithRelations[]>;
   updateTicket(id: string, updates: Partial<InsertTicket>): Promise<Ticket>;
+  deleteTicket(id: string): Promise<void>;
   assignTicket(ticketId: string, assignedToId: string): Promise<void>;
   
   // Comment operations
@@ -57,6 +60,8 @@ export interface IStorage {
   // Attachment operations
   addAttachment(attachment: InsertAttachment): Promise<TicketAttachment>;
   getTicketAttachments(ticketId: string): Promise<(TicketAttachment & { uploadedBy: User })[]>;
+  getAttachment(id: string): Promise<TicketAttachment | undefined>;
+  deleteAttachment(id: string): Promise<void>;
   
   // Analytics operations
   getTicketMetrics(): Promise<{
@@ -87,6 +92,16 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    // Use case-insensitive email comparison
+    const [user] = await db.select().from(users).where(sql`LOWER(${users.email}) = LOWER(${email})`);
+    return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(users.createdAt);
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
@@ -98,6 +113,23 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date(),
         },
       })
+      .returning();
+    return user;
+  }
+
+  async updateUser(id: string, updates: Partial<UpsertUser>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async createUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
       .returning();
     return user;
   }
@@ -152,6 +184,8 @@ export class DatabaseStorage implements IStorage {
     limit?: number;
     offset?: number;
   }): Promise<TicketWithRelations[]> {
+    console.log('Storage getTickets called with filters:', filters);
+    
     let query = db
       .select()
       .from(tickets)
@@ -173,6 +207,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(tickets.assignedToId, filters.assignedToId));
     }
     if (filters?.createdById) {
+      console.log('Adding createdById filter for:', filters.createdById);
       conditions.push(eq(tickets.createdById, filters.createdById));
     }
     if (filters?.search) {
@@ -183,6 +218,8 @@ export class DatabaseStorage implements IStorage {
         )
       );
     }
+
+    console.log('Conditions to apply:', conditions);
 
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;
@@ -196,6 +233,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const result = await query;
+    console.log('Raw query result count:', result.length);
     
     // Transform to TicketWithRelations
     const ticketsWithRelations = await Promise.all(
@@ -219,6 +257,7 @@ export class DatabaseStorage implements IStorage {
       })
     );
     
+    console.log('Final tickets returned:', ticketsWithRelations.length);
     return ticketsWithRelations;
   }
 
@@ -229,6 +268,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(tickets.id, id))
       .returning();
     return updatedTicket;
+  }
+
+  async deleteTicket(id: string): Promise<void> {
+    await db.delete(tickets).where(eq(tickets.id, id));
   }
 
   async assignTicket(ticketId: string, assignedToId: string): Promise<void> {
@@ -323,6 +366,15 @@ export class DatabaseStorage implements IStorage {
       ...row.ticket_attachments,
       uploadedBy: row.users!,
     }));
+  }
+
+  async getAttachment(id: string): Promise<TicketAttachment | undefined> {
+    const [attachment] = await db.select().from(ticketAttachments).where(eq(ticketAttachments.id, id));
+    return attachment;
+  }
+
+  async deleteAttachment(id: string): Promise<void> {
+    await db.delete(ticketAttachments).where(eq(ticketAttachments.id, id));
   }
 
   // Analytics operations

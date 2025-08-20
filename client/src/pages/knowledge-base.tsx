@@ -11,12 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SearchIcon, BookOpenIcon, TagIcon } from "lucide-react";
+import { KnowledgeArticle } from "@/types";
+import { formatDistanceToNow } from "date-fns";
 
 export default function KnowledgeBase() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
   // Redirect to login if not authenticated - Knowledge base is public but we still want auth for better UX
   useEffect(() => {
@@ -33,8 +35,8 @@ export default function KnowledgeBase() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: articles, isLoading: articlesLoading, error: articlesError } = useQuery({
-    queryKey: ["/api/knowledge-base", search, categoryFilter],
+  const { data: articles, isLoading: articlesLoading, error: articlesError } = useQuery<KnowledgeArticle[]>({
+    queryKey: ["/api/knowledge-base", search, categoryFilter === 'all' ? '' : categoryFilter],
     enabled: true, // Knowledge base is accessible to all users
     retry: false,
   });
@@ -115,7 +117,7 @@ export default function KnowledgeBase() {
                     <SelectValue placeholder="All categories" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All categories</SelectItem>
+                    <SelectItem value="all">All categories</SelectItem>
                     <SelectItem value="hardware">Hardware</SelectItem>
                     <SelectItem value="software">Software</SelectItem>
                     <SelectItem value="network">Network</SelectItem>
@@ -146,7 +148,7 @@ export default function KnowledgeBase() {
                 </Card>
               ))
             ) : articles && articles.length > 0 ? (
-              articles.map((article) => (
+              articles.map((article: KnowledgeArticle) => (
                 <Card key={article.id} className="hover:shadow-md transition-shadow cursor-pointer" data-testid={`card-article-${article.id}`}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
@@ -202,7 +204,7 @@ export default function KnowledgeBase() {
           </div>
 
           {/* Popular Categories */}
-          {!search && !categoryFilter && (
+          {!search && categoryFilter === 'all' && (
             <div className="mt-12">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
                 Browse by Category

@@ -12,7 +12,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useLocation } from "wouter";
-import { ArrowLeftIcon, CloudUploadIcon } from "lucide-react";
+import { ArrowLeftIcon, CloudUploadIcon, XIcon, PaperclipIcon } from "lucide-react";
 import { Link } from "wouter";
 
 export default function CreateTicket() {
@@ -27,6 +27,9 @@ export default function CreateTicket() {
     category: "",
     priority: "",
   });
+
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -44,9 +47,32 @@ export default function CreateTicket() {
   }, [isAuthenticated, isLoading, toast]);
 
   const createTicketMutation = useMutation({
-    mutationFn: async (ticketData: typeof formData) => {
-      const response = await apiRequest("POST", "/api/tickets", ticketData);
-      return response.json();
+    mutationFn: async (ticketData: typeof formData & { files: File[] }) => {
+      // First create the ticket
+      const response = await apiRequest("POST", "/api/tickets", {
+        title: ticketData.title,
+        description: ticketData.description,
+        category: ticketData.category,
+        priority: ticketData.priority,
+      });
+      
+      const ticket = await response.json();
+      
+      // Then upload attachments if any
+      if (ticketData.files.length > 0) {
+        const formData = new FormData();
+        ticketData.files.forEach((file) => {
+          formData.append("attachments", file);
+        });
+        
+        await fetch(`/api/tickets/${ticket.id}/attachments`, {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+      }
+      
+      return ticket;
     },
     onSuccess: () => {
       toast({
@@ -88,11 +114,48 @@ export default function CreateTicket() {
       return;
     }
 
-    createTicketMutation.mutate(formData);
+    createTicketMutation.mutate({ ...formData, files: selectedFiles });
   };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setSelectedFiles(Array.from(e.target.files));
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    if (e.dataTransfer.files) {
+      setSelectedFiles(Array.from(e.dataTransfer.files));
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   if (isLoading) {
@@ -204,22 +267,72 @@ export default function CreateTicket() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Attachments
                     </label>
-                    <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-colors">
-                      <CloudUploadIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                        Drop files here or <Button type="button" variant="link" className="p-0 h-auto font-medium text-primary">browse</Button>
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Support for images, documents, and logs (max 10MB)
-                      </p>
-                      <input
-                        type="file"
-                        multiple
-                        className="hidden"
-                        accept=".jpg,.jpeg,.png,.pdf,.txt,.log"
-                        data-testid="input-ticket-attachments"
-                      />
-                    </div>
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      accept=".jpg,.jpeg,.png,.pdf,.txt,.log,.doc,.docx,.xls,.xlsx"
+                      onChange={handleFileSelect}
+                      id="file-upload-create"
+                      data-testid="input-ticket-attachments"
+                    />
+                    <label htmlFor="file-upload-create" className="block">
+                      <div 
+                        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                          isDragOver 
+                            ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' 
+                            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                        }`}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        data-testid="dropzone-ticket-attachments"
+                      >
+                        <CloudUploadIcon className={`w-8 h-8 mx-auto mb-2 ${
+                          isDragOver ? 'text-blue-500' : 'text-gray-400'
+                        }`} />
+                        <p className={`text-sm mb-1 ${
+                          isDragOver 
+                            ? 'text-blue-600 dark:text-blue-400' 
+                            : 'text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {isDragOver ? 'Drop files here' : 'Drop files here or click to browse'}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Support for images, documents, and logs (max 10MB)
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Selected Files Preview */}
+                    {selectedFiles.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Selected files ({selectedFiles.length}):
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
+                          {selectedFiles.map((file, index) => (
+                            <div key={index} className="flex items-center bg-white dark:bg-gray-700 rounded-md p-2 shadow-sm">
+                              <PaperclipIcon className="w-4 h-4 text-gray-500 mr-2" />
+                              <div className="text-sm text-gray-800 dark:text-gray-200 max-w-32 truncate">
+                                {file.name}
+                              </div>
+                              <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                                ({formatFileSize(file.size)})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeFile(index)}
+                                className="ml-2 p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded"
+                                data-testid={`button-remove-attachment-${index}`}
+                              >
+                                <XIcon className="w-4 h-4 text-gray-500 hover:text-red-500" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end space-x-3 pt-4">

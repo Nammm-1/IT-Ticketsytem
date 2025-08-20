@@ -3,22 +3,24 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-import TicketCard from "@/components/tickets/ticket-card";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusIcon, SearchIcon, FilterIcon } from "lucide-react";
 import { Link } from "wouter";
+import TicketCard from "@/components/tickets/ticket-card";
+import { Ticket } from "@/types";
 
 export default function Tickets() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const queryClient = useQueryClient();
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -37,15 +39,57 @@ export default function Tickets() {
 
   const queryParams = new URLSearchParams();
   if (search) queryParams.append('search', search);
-  if (statusFilter) queryParams.append('status', statusFilter);
-  if (priorityFilter) queryParams.append('priority', priorityFilter);
-  if (categoryFilter) queryParams.append('category', categoryFilter);
+  if (statusFilter !== 'all') queryParams.append('status', statusFilter);
+  if (priorityFilter !== 'all') queryParams.append('priority', priorityFilter);
+  if (categoryFilter !== 'all') queryParams.append('category', categoryFilter);
 
   const { data: tickets, isLoading: ticketsLoading, error: ticketsError } = useQuery({
     queryKey: ["/api/tickets", search, statusFilter, priorityFilter, categoryFilter],
+    queryFn: async () => {
+      const url = `/api/tickets${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const response = await fetch(url, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch tickets');
+      }
+      return response.json();
+    },
     enabled: isAuthenticated,
     retry: false,
+    refetchInterval: 5000, // Refresh every 5 seconds to show new tickets
   });
+
+  const deleteTicketMutation = useMutation({
+    mutationFn: async (ticketId: string) => {
+      const response = await fetch(`/api/tickets/${ticketId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete ticket');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Ticket deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to delete ticket",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteTicket = (ticketId: string) => {
+    deleteTicketMutation.mutate(ticketId);
+  };
 
   // Handle unauthorized errors
   useEffect(() => {
@@ -113,7 +157,7 @@ export default function Tickets() {
                       <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All statuses</SelectItem>
+                      <SelectItem value="all">All statuses</SelectItem>
                       <SelectItem value="new">New</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
@@ -132,7 +176,7 @@ export default function Tickets() {
                       <SelectValue placeholder="All priorities" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All priorities</SelectItem>
+                      <SelectItem value="all">All priorities</SelectItem>
                       <SelectItem value="low">Low</SelectItem>
                       <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="high">High</SelectItem>
@@ -150,7 +194,7 @@ export default function Tickets() {
                       <SelectValue placeholder="All categories" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All categories</SelectItem>
+                      <SelectItem value="all">All categories</SelectItem>
                       <SelectItem value="hardware">Hardware</SelectItem>
                       <SelectItem value="software">Software</SelectItem>
                       <SelectItem value="network">Network</SelectItem>
@@ -195,8 +239,14 @@ export default function Tickets() {
                 </div>
               ) : tickets && tickets.length > 0 ? (
                 <div className="space-y-4">
-                  {tickets.map((ticket) => (
-                    <TicketCard key={ticket.id} ticket={ticket} showDetails />
+                  {tickets.map((ticket: Ticket) => (
+                    <TicketCard 
+                      key={ticket.id} 
+                      ticket={ticket} 
+                      showDetails 
+                      onDelete={() => handleDeleteTicket(ticket.id)}
+                      currentUserId={user?.id}
+                    />
                   ))}
                 </div>
               ) : (
