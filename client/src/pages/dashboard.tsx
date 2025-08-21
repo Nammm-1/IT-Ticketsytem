@@ -15,7 +15,8 @@ import {
   UserIcon, 
   ArrowRightIcon,
   CalendarIcon,
-  AlertTriangleIcon
+  AlertTriangleIcon,
+  ListIcon
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
@@ -195,12 +196,20 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <Link href="/create-ticket">
-                    <Button className="w-full justify-start" size="lg">
-                      <PlusIcon className="w-5 h-5 mr-3" />
-                      Create New Ticket
-                    </Button>
-                  </Link>
+                  <div className="flex space-x-4">
+                    <Link href="/create-ticket">
+                      <Button className="transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-lg">
+                        <PlusIcon className="w-4 h-4 mr-2" />
+                        Create Ticket
+                      </Button>
+                    </Link>
+                    <Link href="/tickets">
+                      <Button variant="outline" className="transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md">
+                        <ListIcon className="w-4 h-4 mr-2" />
+                        View Tickets
+                      </Button>
+                    </Link>
+                  </div>
                   
                   <Link href="/tickets">
                     <Button variant="outline" className="w-full justify-start" size="lg">

@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ClockIcon, UserIcon, CalendarIcon, TrashIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -101,7 +101,7 @@ export default function TicketCard({
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow" data-testid={`card-ticket-${ticket.id}`}>
+    <Card className="hover:shadow-lg transition-all duration-200 ease-in-out cursor-pointer" data-testid={`card-ticket-${ticket.id}`}>
       <CardContent className="p-4">
         <div className="flex items-start space-x-4">
           <div className="flex-shrink-0">
@@ -125,7 +125,7 @@ export default function TicketCard({
                     variant="ghost"
                     onClick={handleDelete}
                     disabled={isDeleting}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 ease-in-out hover:shadow-md"
                     data-testid={`button-delete-ticket-${ticket.id}`}
                   >
                     <TrashIcon className="w-4 h-4" />
@@ -160,12 +160,22 @@ export default function TicketCard({
             {showDetails && (
               <div className="mt-3 flex items-center space-x-2">
                 <Link href={`/ticket/${ticket.id}`}>
-                  <Button size="sm" variant="outline" data-testid={`button-view-ticket-${ticket.id}`}>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="transition-all duration-200 ease-in-out hover:shadow-md"
+                    data-testid={`button-view-ticket-${ticket.id}`}
+                  >
                     View Details
                   </Button>
                 </Link>
                 {ticket.status !== 'resolved' && ticket.status !== 'closed' && (
-                  <Button size="sm" variant="ghost" data-testid={`button-update-ticket-${ticket.id}`}>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="transition-all duration-200 ease-in-out hover:shadow-md"
+                    data-testid={`button-update-ticket-${ticket.id}`}
+                  >
                     Update Status
                   </Button>
                 )}

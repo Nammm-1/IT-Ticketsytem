@@ -44,6 +44,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: userRoleEnum('role').default('end_user').notNull(),
+  is_active: integer('is_active').default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -56,8 +57,8 @@ export const tickets = pgTable("tickets", {
   category: ticketCategoryEnum('category').notNull(),
   priority: ticketPriorityEnum('priority').notNull(),
   status: ticketStatusEnum('status').default('new').notNull(),
-  createdById: varchar("created_by_id").notNull().references(() => users.id),
-  assignedToId: varchar("assigned_to_id").references(() => users.id),
+  createdById: varchar("created_by_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  assignedToId: varchar("assigned_to_id").references(() => users.id, { onDelete: 'set null' }),
   resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -67,7 +68,7 @@ export const tickets = pgTable("tickets", {
 export const ticketComments = pgTable("ticket_comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ticketId: varchar("ticket_id").notNull().references(() => tickets.id, { onDelete: 'cascade' }),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   content: text("content").notNull(),
   isInternal: integer("is_internal").default(0).notNull(), // 0 = public, 1 = internal note
   createdAt: timestamp("created_at").defaultNow(),
@@ -80,7 +81,7 @@ export const knowledgeArticles = pgTable("knowledge_articles", {
   content: text("content").notNull(),
   category: ticketCategoryEnum('category').notNull(),
   tags: text("tags").array(),
-  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdById: varchar("created_by_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -93,7 +94,19 @@ export const ticketAttachments = pgTable("ticket_attachments", {
   filePath: varchar("file_path", { length: 500 }).notNull(),
   fileSize: integer("file_size").notNull(),
   mimeType: varchar("mime_type", { length: 100 }).notNull(),
-  uploadedById: varchar("uploaded_by_id").notNull().references(() => users.id),
+  uploadedById: varchar("uploaded_by_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// In-app notifications table
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  type: varchar("type", { length: 50 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  data: jsonb("data"),
+  isRead: integer("is_read").default(0).notNull(), // 0 = unread, 1 = read
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -150,6 +163,13 @@ export const ticketAttachmentsRelations = relations(ticketAttachments, ({ one })
   }),
 }));
 
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertTicketSchema = createInsertSchema(tickets).omit({
   id: true,
@@ -174,6 +194,11 @@ export const insertAttachmentSchema = createInsertSchema(ticketAttachments).omit
   createdAt: true,
 });
 
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -185,6 +210,8 @@ export type InsertKnowledgeArticle = z.infer<typeof insertKnowledgeArticleSchema
 export type KnowledgeArticle = typeof knowledgeArticles.$inferSelect;
 export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
 export type TicketAttachment = typeof ticketAttachments.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
 
 // Ticket with relations type
 export type TicketWithRelations = Ticket & {

@@ -381,9 +381,159 @@ export async function setupAuth(app: Express) {
       `);
   });
 
+  // Development authentication (for testing)
+  if (process.env.NODE_ENV === 'development' && process.env.DEV_AUTH === 'true') {
+    console.log('🔧 Using development authentication');
+    
+    app.post('/api/login', async (req, res) => {
+      try {
+        const { email, password } = req.body;
+        
+        if (!email || !password) {
+          return res.status(400).json({ message: 'Email and password are required' });
+        }
+        
+        // Find user by email (case-insensitive)
+        const user = await storage.getUserByEmail(email);
+        
+        if (!user) {
+          return res.status(401).json({ message: 'Invalid credentials' });
+        }
+        
+        // CRITICAL SECURITY CHECK: Block deactivated users
+        if (user.is_active === 0) {
+          console.log(`🚫 LOGIN BLOCKED: Deactivated user ${email} attempted to login via dev auth`);
+          return res.status(401).json({ 
+            message: "Account is deactivated. Please contact an administrator to reactivate your account.",
+            code: "ACCOUNT_DEACTIVATED"
+          });
+        }
+        
+        // For development, accept any password
+        if (password === 'dev123' || password === 'temp123') {
+          // Set up session
+          (req.session as any).userId = user.id;
+          (req.session as any).userRole = user.role;
+          (req.session as any).userEmail = user.email;
+          
+          await new Promise<void>((resolve, reject) => {
+            req.session.save((err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+          
+          console.log(`✅ Development login successful: ${email} (${user.role})`);
+          
+          // Redirect to dashboard
+          res.redirect('/dashboard');
+        } else {
+          res.status(401).json({ message: 'Invalid credentials' });
+        }
+      } catch (error) {
+        console.error('Development login error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+      }
+    });
+  }
+
+  // Middleware to check if user is active (can be used to protect other routes)
+  const checkUserActive = async (req: any, res: any, next: any) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        req.session.destroy(() => {});
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Check if user is active
+      if (user.is_active === 0) {
+        console.log(`🚫 ACCESS BLOCKED: Deactivated user ${user.email} attempted to access protected route`);
+        req.session.destroy(() => {});
+        return res.status(401).json({ 
+          message: "Account is deactivated. Please contact an administrator to reactivate your account.",
+          code: "ACCOUNT_DEACTIVATED"
+        });
+      }
+      
+      // Add user info to request for use in route handlers
+      (req as any).user = user;
+      next();
+    } catch (error) {
+      console.error('Error in checkUserActive middleware:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  };
+
+  // Test endpoint to manually deactivate a user (for testing security)
+  app.post("/api/test/deactivate-user/:email", async (req, res) => {
+    try {
+      const { email } = req.params;
+      console.log(`🧪 TEST: Attempting to deactivate user: ${email}`);
+      
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Manually set user to inactive
+      const updatedUser = await storage.updateUser(user.id, {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        is_active: 0
+      });
+      
+      console.log(`🧪 TEST: User ${email} deactivated successfully`);
+      res.json({ 
+        message: "User deactivated for testing",
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error('Error deactivating user:', error);
+      res.status(500).json({ message: "Failed to deactivate user" });
+    }
+  });
+
+  // Test endpoint to manually reactivate a user (for testing security)
+  app.post("/api/test/reactivate-user/:email", async (req, res) => {
+    try {
+      const { email } = req.params;
+      console.log(`🧪 TEST: Attempting to reactivate user: ${email}`);
+      
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Manually set user to active
+      const updatedUser = await storage.updateUser(user.id, {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        is_active: 1
+      });
+      
+      console.log(`🧪 TEST: User ${email} reactivated successfully`);
+      res.json({ 
+        message: "User reactivated for testing",
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error('Error reactivating user:', error);
+      res.status(500).json({ message: "Failed to reactivate user" });
+    }
+  });
+
   // Session authentication endpoint
   app.post("/api/login", async (req, res) => {
-
       const { email, password } = req.body;
       
       if (!email || !password) {
@@ -399,6 +549,15 @@ export async function setupAuth(app: Express) {
         
         let devUser;
         if (existingUser) {
+          // CRITICAL SECURITY CHECK: Block deactivated users
+          if (existingUser.is_active === 0) {
+            console.log(`🚫 LOGIN BLOCKED: Deactivated user ${email} attempted to login`);
+            return res.status(401).json({ 
+              message: "Account is deactivated. Please contact an administrator to reactivate your account.",
+              code: "ACCOUNT_DEACTIVATED"
+            });
+          }
+          
           // Use existing user's data and role
           devUser = {
             id: existingUser.id,
@@ -460,26 +619,49 @@ export async function setupAuth(app: Express) {
   });
 
   // Authentication check endpoint
-  app.get("/api/auth/user", (req, res) => {
-
+  app.get("/api/auth/user", async (req, res) => {
       // Check if user is logged in via session
       const userId = (req.session as any).userId;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // Return user information
-      const user = {
-        id: userId,
-        email: (req.session as any).userEmail,
-        firstName: (req.session as any).userEmail?.split('@')[0] || 'User',
-        lastName: 'User',
-        role: (req.session as any).userRole || 'admin',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
+      try {
+        // Get user from database to check if they're still active
+        const user = await storage.getUser(userId);
+        if (!user) {
+          // Clear invalid session
+          req.session.destroy(() => {});
+          return res.status(401).json({ message: "User not found" });
+        }
+        
+        // CRITICAL SECURITY CHECK: Block deactivated users from accessing protected routes
+        if (user.is_active === 0) {
+          console.log(`🚫 ACCESS BLOCKED: Deactivated user ${user.email} attempted to access protected route`);
+          // Clear the session
+          req.session.destroy(() => {});
+          return res.status(401).json({ 
+            message: "Account is deactivated. Please contact an administrator to reactivate your account.",
+            code: "ACCOUNT_DEACTIVATED"
+          });
+        }
 
-      res.json(user);
+        // Return user information
+        const userInfo = {
+          id: userId,
+          email: (req.session as any).userEmail,
+          firstName: (req.session as any).userEmail?.split('@')[0] || 'User',
+          lastName: 'User',
+          role: (req.session as any).userRole || 'admin',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        res.json(userInfo);
+      } catch (error) {
+        console.error('Error fetching user:', error);
+        res.status(500).json({ message: "Failed to fetch user" });
+      }
   });
 
     // Test endpoint to verify role logic
@@ -969,14 +1151,35 @@ export async function setupAuth(app: Express) {
         
         console.log(`New user created: ${email} with role: ${newUser.role}`);
         
-        res.json({ 
-          message: "Account created successfully! You can now sign in with your email and password.",
-          user: {
-            id: newUser.id,
-            email: newUser.email,
-            firstName: newUser.firstName,
-            lastName: newUser.lastName,
-            role: newUser.role
+        const loginUrl = `${req.protocol}://${req.get('host')}/login`;
+        const emailResult = await emailService.sendUserCreationEmail({
+          to: email,
+          firstName,
+          lastName,
+          email,
+          tempPassword: '', // Will be generated by email service
+          loginUrl
+        });
+        // In-app notification for the new user
+        try {
+          await storage.createNotification({
+            userId: newUser.id,
+            type: 'welcome',
+            title: 'Welcome to IT Support',
+            message: `Your account has been created. A temporary password has been sent to ${email}.`,
+            data: { email },
+          } as any);
+        } catch (e) {
+          console.warn('Failed to create welcome notification:', e);
+        }
+        
+        // Return user data with email result
+        res.status(201).json({
+          ...newUser,
+          emailResult: {
+            success: emailResult.success,
+            message: emailResult.message,
+            tempPassword: emailResult.tempPassword
           }
         });
       } catch (error) {
@@ -1032,6 +1235,49 @@ export async function setupAuth(app: Express) {
       } catch (error) {
         console.error('Error updating user:', error);
         res.status(500).json({ message: "Failed to update user" });
+      }
+  });
+
+  // Hard delete (completely remove) user
+  app.delete("/api/users/:userId", async (req, res) => {
+      try {
+        const { userId } = req.params;
+        console.log(`Attempting to delete user: ${userId}`);
+        
+        const adminId = (req.session as any).userId;
+        console.log(`Admin ID from session: ${adminId}`);
+        
+        const adminUser = await storage.getUser(adminId);
+        console.log(`Admin user found:`, adminUser ? { id: adminUser.id, role: adminUser.role } : 'Not found');
+        
+        if (!adminUser || adminUser.role !== 'admin') {
+          console.log('Access denied - not admin');
+          return res.status(403).json({ message: 'Access denied' });
+        }
+        
+        const user = await storage.getUser(userId);
+        console.log(`Target user found:`, user ? { id: user.id, email: user.email } : 'Not found');
+        
+        if (!user) {
+          console.log('User not found');
+          return res.status(404).json({ message: 'User not found' });
+        }
+        
+        // Prevent admin from deleting themselves
+        if (userId === adminId) {
+          console.log('Cannot delete own account');
+          return res.status(400).json({ message: 'Cannot delete your own account' });
+        }
+        
+        console.log('Attempting to delete user from database...');
+        // Completely remove the user from the database
+        await storage.deleteUser(userId);
+        console.log('User successfully deleted from database');
+        
+        res.json({ success: true, message: 'User completely removed from system' });
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({ message: 'Failed to delete user', error: error instanceof Error ? error.message : String(error) });
       }
   });
 
@@ -1122,6 +1368,18 @@ export async function setupAuth(app: Express) {
           tempPassword: '', // Will be generated by email service
           loginUrl
         });
+        // In-app notification
+        try {
+          await storage.createNotification({
+            userId: user.id,
+            type: 'password_reset',
+            title: 'Password Reset',
+            message: 'Your password has been reset. Check your email for the temporary password.',
+            data: {},
+          } as any);
+        } catch (e) {
+          console.warn('Failed to create password reset notification:', e);
+        }
         
         // Return result
         res.json({

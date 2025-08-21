@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "dev:tunnel": "concurrently -r -k -n server,ngrok \"sh -c 'PORT=${PORT:-5001} NODE_ENV=development tsx server/index.ts'\" \"sh -c 'PORT=${PORT:-5001}; if [ -n \"$NGROK_AUTHTOKEN\" ]; then npx -y ngrok config add-authtoken $NGROK_AUTHTOKEN; fi; npx -y ngrok http --log=stdout --log-format=term $PORT'\"",
+    "dev:tunnel": "./scripts/dev-tunnel.sh",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",

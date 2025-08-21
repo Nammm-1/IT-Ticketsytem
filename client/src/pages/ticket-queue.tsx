@@ -37,8 +37,60 @@ export default function TicketQueue() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [assignedFilter, setAssignedFilter] = useState("all");
   const [sortBy, setSortBy] = useState("createdAt");
-  const [sortOrder, setSortOrder] = useState("desc");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const queryClient = useQueryClient();
+
+  // Inject CSS to force dropdown backgrounds to be opaque
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .select-content {
+        background-color: white !important;
+        background: white !important;
+        opacity: 1 !important;
+      }
+      .dark .select-content {
+        background-color: rgb(31, 41, 55) !important;
+        background: rgb(31, 41, 55) !important;
+        opacity: 1 !important;
+      }
+      .select-item {
+        background-color: white !important;
+        background: white !important;
+        opacity: 1 !important;
+      }
+      .dark .select-item {
+        background-color: rgb(31, 41, 55) !important;
+        background: rgb(31, 41, 55) !important;
+        opacity: 1 !important;
+      }
+      .select-trigger {
+        background-color: white !important;
+        background: white !important;
+        opacity: 1 !important;
+      }
+      .dark .select-trigger {
+        background-color: rgb(31, 41, 55) !important;
+        background: rgb(31, 41, 55) !important;
+        opacity: 1 !important;
+      }
+      [data-radix-popper-content-wrapper] {
+        background-color: white !important;
+        background: white !important;
+        opacity: 1 !important;
+      }
+      .dark [data-radix-popper-content-wrapper] {
+        background-color: rgb(31, 41, 55) !important;
+        background: rgb(31, 41, 55) !important;
+        opacity: 1 !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -298,54 +350,54 @@ export default function TicketQueue() {
               
               <div className="flex gap-2">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger data-testid="select-status-filter">
+                  <SelectTrigger data-testid="select-status-filter" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="new">New</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
+                  <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                    <SelectItem value="all" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">All statuses</SelectItem>
+                    <SelectItem value="new" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">New</SelectItem>
+                    <SelectItem value="in_progress" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">In Progress</SelectItem>
+                    <SelectItem value="pending" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Pending</SelectItem>
+                    <SelectItem value="resolved" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Resolved</SelectItem>
+                    <SelectItem value="closed" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Closed</SelectItem>
                   </SelectContent>
                 </Select>
 
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger data-testid="select-priority-filter">
+                  <SelectTrigger data-testid="select-priority-filter" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                     <SelectValue placeholder="All priorities" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All priorities</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
+                  <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                    <SelectItem value="all" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">All priorities</SelectItem>
+                    <SelectItem value="low" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Low</SelectItem>
+                    <SelectItem value="medium" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Medium</SelectItem>
+                    <SelectItem value="high" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">High</SelectItem>
+                    <SelectItem value="critical" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Critical</SelectItem>
                   </SelectContent>
                 </Select>
 
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger data-testid="select-category-filter">
+                  <SelectTrigger data-testid="select-category-filter" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                     <SelectValue placeholder="All categories" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All categories</SelectItem>
-                    <SelectItem value="hardware">Hardware</SelectItem>
-                    <SelectItem value="software">Software</SelectItem>
-                    <SelectItem value="network">Network</SelectItem>
-                    <SelectItem value="access">Access</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                  <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                    <SelectItem value="all" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">All categories</SelectItem>
+                    <SelectItem value="hardware" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Hardware</SelectItem>
+                    <SelectItem value="software" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Software</SelectItem>
+                    <SelectItem value="network" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Network</SelectItem>
+                    <SelectItem value="access" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Access</SelectItem>
+                    <SelectItem value="other" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Other</SelectItem>
                   </SelectContent>
                 </Select>
 
                 <Select value={assignedFilter} onValueChange={setAssignedFilter}>
-                  <SelectTrigger data-testid="select-assigned-filter">
+                  <SelectTrigger data-testid="select-assigned-filter" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                     <SelectValue placeholder="All assignments" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All assignments</SelectItem>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    <SelectItem value="assigned">Assigned</SelectItem>
+                  <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                    <SelectItem value="all" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">All assignments</SelectItem>
+                    <SelectItem value="unassigned" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Unassigned</SelectItem>
+                    <SelectItem value="assigned" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Assigned</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -353,14 +405,14 @@ export default function TicketQueue() {
 
             <div className="flex items-center gap-4">
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-48 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="createdAt">Created Date</SelectItem>
-                  <SelectItem value="priority">Priority</SelectItem>
-                  <SelectItem value="status">Status</SelectItem>
-                  <SelectItem value="updatedAt">Last Updated</SelectItem>
+                <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                  <SelectItem value="createdAt" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Created Date</SelectItem>
+                  <SelectItem value="priority" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Priority</SelectItem>
+                  <SelectItem value="status" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Status</SelectItem>
+                  <SelectItem value="updatedAt" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Last Updated</SelectItem>
                 </SelectContent>
               </Select>
 

@@ -101,3 +101,29 @@
     overflow: hidden;
   }
 }
+
+/* Simple hover effects without transforms to avoid runtime issues */
+@layer components {
+  /* Button hover effects */
+  .btn-hover {
+    @apply transition-all duration-200 ease-in-out;
+  }
+  
+  .btn-hover:hover {
+    @apply shadow-md;
+  }
+
+  /* Card hover effects */
+  .card-hover {
+    @apply transition-all duration-200 ease-in-out;
+  }
+  
+  .card-hover:hover {
+    @apply shadow-lg;
+  }
+
+  /* Input focus effects */
+  input:focus, textarea:focus, select:focus {
+    @apply ring-2 ring-blue-500 ring-opacity-50 border-blue-500;
+  }
+}

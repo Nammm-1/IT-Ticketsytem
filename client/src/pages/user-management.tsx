@@ -49,10 +49,87 @@ interface EditUserForm {
   is_active: boolean;
 }
 
+interface EditFormErrors {
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+}
+
 export default function UserManagement() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading, user } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Inject CSS to fix transparent dropdowns and other UI elements
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      /* Force opaque backgrounds for all UI components */
+      .select-content, .select-item, .select-trigger,
+      [data-radix-popper-content-wrapper],
+      .bg-red-50, .bg-blue-50, .bg-yellow-50, .bg-green-50,
+      .dark .bg-red-900\\/20, .dark .bg-blue-900\\/20, .dark .bg-yellow-900\\/20, .dark .bg-green-900\\/20,
+      .bg-white, .dark .bg-gray-800,
+      .bg-gray-50, .dark .bg-gray-900,
+      .bg-primary, .bg-secondary,
+      .bg-destructive, .bg-muted,
+      .bg-popover, .bg-card,
+      .bg-accent, .bg-accent-foreground {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Force opaque borders */
+      .border, .border-red-200, .border-blue-200, .border-yellow-200, .border-green-200,
+      .dark .border-red-800, .dark .border-blue-800, .dark .border-yellow-800, .dark .border-green-800,
+      .border-gray-300, .dark .border-gray-600 {
+        border-color: var(--border) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Force opaque text */
+      .text-red-500, .text-blue-600, .text-yellow-600, .text-green-600,
+      .dark .text-red-400, .dark .text-blue-400, .dark .text-yellow-400, .dark .text-green-400 {
+        color: var(--foreground) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Ensure modals and overlays are opaque */
+      .fixed.inset-0.bg-black.bg-opacity-50,
+      .bg-white, .dark .bg-gray-800,
+      .bg-gray-50, .dark .bg-gray-900 {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Fix any remaining transparent elements */
+      .bg-opacity-50, .bg-opacity-20, .bg-opacity-10 {
+        opacity: 1 !important;
+      }
+      
+      /* Ensure form elements have proper backgrounds */
+      input, select, textarea, button {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Fix modal backgrounds */
+      .modal, .dialog, .popover, .tooltip {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
   
   // State for user management
   const [searchTerm, setSearchTerm] = useState("");
@@ -75,7 +152,12 @@ export default function UserManagement() {
     role: "",
     is_active: true
   });
-  const [editErrors, setEditErrors] = useState<{ [key: string]: string }>({});
+  const [editErrors, setEditErrors] = useState<EditFormErrors>({
+    firstName: "",
+    lastName: "",
+    email: "",
+    role: ""
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // State for create form
@@ -162,7 +244,7 @@ export default function UserManagement() {
   // Edit user mutation
   const editUserMutation = useMutation({
     mutationFn: async ({ userId, userData }: { userId: string; userData: EditUserForm }) => {
-      const response = await fetch(`/api/users/${userId}`, {
+      const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -193,7 +275,12 @@ export default function UserManagement() {
         role: "",
         is_active: true
       });
-      setEditErrors({});
+      setEditErrors({
+        firstName: "",
+        lastName: "",
+        email: "",
+        role: ""
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -298,7 +385,7 @@ export default function UserManagement() {
   // Reset password mutation
   const resetPasswordMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const response = await fetch(`/api/users/${userId}/reset-password`, {
+      const response = await fetch(`/api/users/${encodeURIComponent(userId)}/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -367,6 +454,105 @@ export default function UserManagement() {
     },
   });
 
+  // Simple toggle function that actually works
+  const simpleToggleStatus = async (userId: string) => {
+    try {
+      console.log(`🔧 SIMPLE TOGGLE: Starting for user ${userId}`);
+      
+      const targetUser = users?.find(u => u.id === userId);
+      if (!targetUser) {
+        console.log(`🔧 SIMPLE TOGGLE: User not found`);
+        return;
+      }
+      
+      const currentStatus = isUserActive(targetUser);
+      const newStatus = !currentStatus;
+      
+      console.log(`🔧 SIMPLE TOGGLE: Current status: ${currentStatus}, New status: ${newStatus}`);
+      console.log(`🔧 SIMPLE TOGGLE: User data:`, targetUser);
+      
+      // Use the new dedicated toggle endpoint
+      const response = await fetch(`/api/users/${encodeURIComponent(userId)}/toggle-status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      
+      console.log(`🔧 SIMPLE TOGGLE: Response status:`, response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.log(`🔧 SIMPLE TOGGLE: Error:`, errorData);
+        throw new Error(errorData.message || 'Failed to update user status');
+      }
+      
+      const result = await response.json();
+      console.log(`🔧 SIMPLE TOGGLE: Success! Result:`, result);
+      
+      // Update local state immediately
+      if (users) {
+        const updatedUsers = users.map(user => 
+          user.id === userId 
+            ? { ...user, is_active: result.newStatus }
+            : user
+        );
+        queryClient.setQueryData(["/api/users"], updatedUsers);
+      }
+      
+      // Show success message
+      const statusText = result.newStatus ? 'active' : 'inactive';
+      toast({
+        title: "Status Updated",
+        description: `User ${targetUser.email} is now ${statusText}. ${
+          !result.newStatus 
+            ? '⚠️ This user can no longer log in and must contact an administrator to reactivate their account.' 
+            : '✅ This user can now log in normally.'
+        }`,
+        duration: 8000,
+      });
+      
+    } catch (error) {
+      console.error(`🔧 SIMPLE TOGGLE: Error:`, error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update user status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Delete (completely remove) user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete user');
+      }
+      return response.json();
+    },
+    onSuccess: (data, userId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      const targetUser = users?.find(u => u.id === userId);
+      toast({
+        title: "User Deleted",
+        description: `User ${targetUser?.email || userId} has been completely removed from the system.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Calculate user statistics
   const calculateUserStats = (): UserStats => {
     if (!users) {
@@ -380,7 +566,7 @@ export default function UserManagement() {
     }
 
     const totalUsers = users.length;
-    const activeUsers = users.filter((u: User) => u.is_active !== false).length;
+    const activeUsers = users.filter((u: User) => isUserActive(u)).length;
     const inactiveUsers = totalUsers - activeUsers;
     
     const roleDistribution = users.reduce((acc: any, u: User) => {
@@ -403,6 +589,11 @@ export default function UserManagement() {
     };
   };
 
+  // Helper function to check if user is active
+  const isUserActive = (user: User): boolean => {
+    return user.is_active !== false && user.is_active !== 0;
+  };
+
   // Filter and sort users
   const getFilteredAndSortedUsers = (): User[] => {
     if (!users) return [];
@@ -415,8 +606,8 @@ export default function UserManagement() {
       
       const matchesRole = roleFilter === "all" || u.role === roleFilter;
       const matchesStatus = statusFilter === "all" || 
-        (statusFilter === "active" && u.is_active !== false) ||
-        (statusFilter === "inactive" && u.is_active === false);
+        (statusFilter === "active" && isUserActive(u)) ||
+        (statusFilter === "inactive" && !isUserActive(u));
       
       return matchesSearch && matchesRole && matchesStatus;
     });
@@ -475,7 +666,22 @@ export default function UserManagement() {
 
   // Handle user actions
   const handleUserAction = (action: string, userId: string) => {
+    console.log(`🎯 handleUserAction called with action: "${action}" for user: ${userId}`);
+    console.log(`🎯 Current time: ${new Date().toISOString()}`);
+    console.log(`🎯 Stack trace:`, new Error().stack);
+    
+    // Prevent multiple actions from running simultaneously
+    if (editUserMutation.isPending || deleteUserMutation.isPending) {
+      console.log(`🎯 Another action is already in progress, ignoring ${action}`);
+      console.log(`🎯 Current mutations state:`, {
+        edit: editUserMutation.isPending,
+        delete: deleteUserMutation.isPending
+      });
+      return;
+    }
+    
     if (action === "Edit") {
+      console.log(`Frontend: Processing Edit action for user: ${userId}`);
       const userToEdit = users?.find(u => u.id === userId);
       if (userToEdit) {
         setSelectedUser(userToEdit);
@@ -484,12 +690,18 @@ export default function UserManagement() {
           lastName: userToEdit.lastName || "",
           email: userToEdit.email,
           role: userToEdit.role,
-          is_active: userToEdit.is_active !== false
+          is_active: isUserActive(userToEdit)
         });
-        setEditErrors({});
+        setEditErrors({
+          firstName: "",
+          lastName: "",
+          email: "",
+          role: ""
+        });
         setShowEditModal(true);
       }
     } else if (action === "Create User") {
+      console.log(`Frontend: Processing Create User action`);
       setCreateForm({
         firstName: "",
         lastName: "",
@@ -500,25 +712,45 @@ export default function UserManagement() {
       setCreateErrors({});
       setShowCreateModal(true);
     } else if (action === "Delete") {
-      // TODO: Implement delete functionality
-      toast({
-        title: "Action Not Implemented",
-        description: `${action} functionality will be implemented in the next phase.`,
-      });
+      console.log(`Frontend: Processing Delete action for user: ${userId}`);
+      const targetUser = users?.find(u => u.id === userId);
+      if (!targetUser) return;
+      if (user && targetUser.id === user.id) {
+        toast({
+          title: "Cannot Delete Yourself",
+          description: "You cannot delete your own account. Use the logout function instead.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const confirmed = window.confirm(`⚠️ PERMANENT DELETE: Are you sure you want to completely remove user ${targetUser.email}? This action cannot be undone and will permanently delete all their data.`);
+      if (!confirmed) return;
+      deleteUserMutation.mutate(userId);
     } else if (action === "Reset Password") {
+      console.log(`Frontend: Processing Reset Password action for user: ${userId}`);
       resetPasswordMutation.mutate(userId);
     } else if (action === "Toggle Status") {
-      // TODO: Implement toggle status functionality
-      toast({
-        title: "Action Not Implemented",
-        description: `${action} functionality will be implemented in the next phase.`,
-      });
+      console.log(`🎯 TOGGLE STATUS BUTTON CLICKED for user: ${userId}`);
+      console.log(`🎯 Action parameter: "${action}"`);
+      console.log(`🎯 User ID: ${userId}`);
+      
+      // Use the simple toggle function instead of the broken mutation
+      console.log(`🎯 Calling simpleToggleStatus(${userId})`);
+      simpleToggleStatus(userId);
+      console.log(`🎯 simpleToggleStatus(${userId}) called`);
+    } else {
+      console.log(`Frontend: Unknown action: "${action}"`);
     }
   };
 
   // Validate edit form
   const validateEditForm = (): boolean => {
-    const errors: { [key: string]: string } = {};
+    const errors: EditFormErrors = {
+      firstName: "",
+      lastName: "",
+      email: "",
+      role: ""
+    };
 
     if (!editForm.firstName.trim()) {
       errors.firstName = "First name is required";
@@ -539,27 +771,37 @@ export default function UserManagement() {
     }
 
     setEditErrors(errors);
-    return Object.keys(errors).length === 0;
+    return Object.keys(errors).filter(key => errors[key as keyof EditFormErrors]).length === 0;
   };
 
   // Handle edit form submission
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log(`📝 EDIT FORM SUBMITTED - This should NOT happen when clicking toggle!`);
+    console.log(`📝 Edit form data:`, editForm);
+    console.log(`📝 Selected user:`, selectedUser);
     
-    if (!validateEditForm() || !selectedUser) {
+    // Validate form
+    const errors: EditFormErrors = {
+      firstName: "",
+      lastName: "",
+      email: "",
+      role: ""
+    };
+    if (!editForm.firstName.trim()) errors.firstName = "First name is required";
+    if (!editForm.lastName.trim()) errors.lastName = "Last name is required";
+    if (!editForm.email.trim()) errors.email = "Email is required";
+    if (!editForm.role) errors.role = "Role is required";
+    
+    if (Object.keys(errors).filter(key => errors[key as keyof EditFormErrors]).length > 0) {
+      setEditErrors(errors);
       return;
     }
-
-    setIsSubmitting(true);
     
-    try {
-      await editUserMutation.mutateAsync({
-        userId: selectedUser.id,
-        userData: editForm
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (!selectedUser) return;
+    
+    console.log(`📝 Calling editUserMutation for user: ${selectedUser.id}`);
+    editUserMutation.mutate({ userId: selectedUser.id, userData: editForm });
   };
 
   // Handle edit form changes
@@ -570,10 +812,10 @@ export default function UserManagement() {
     }));
     
     // Clear error for this field when user starts typing
-    if (editErrors[field]) {
+    if (editErrors[field as keyof EditFormErrors]) {
       setEditErrors(prev => ({
         ...prev,
-        [field]: ""
+        [field as keyof EditFormErrors]: ""
       }));
     }
   };
@@ -714,48 +956,48 @@ export default function UserManagement() {
                   placeholder="Search users..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-full sm:w-64 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                  className="pl-10 w-full sm:w-64 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                 />
               </div>
 
               {/* Role Filter */}
               <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-40 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600">
+                <SelectTrigger className="select-trigger w-40 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                   <SelectValue placeholder="All Roles" />
                 </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 shadow-lg">
-                  <SelectItem value="all" className="hover:bg-gray-100 dark:hover:bg-gray-700">All Roles</SelectItem>
-                  <SelectItem value="admin" className="hover:bg-gray-100 dark:hover:bg-gray-700">Admin</SelectItem>
-                  <SelectItem value="manager" className="hover:bg-gray-100 dark:hover:bg-gray-700">Manager</SelectItem>
-                  <SelectItem value="it_staff" className="hover:bg-gray-100 dark:hover:bg-gray-700">IT Staff</SelectItem>
-                  <SelectItem value="end_user" className="hover:bg-gray-100 dark:hover:bg-gray-700">End User</SelectItem>
+                <SelectContent className="select-content !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                  <SelectItem value="all" className="select-item !bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">All Roles</SelectItem>
+                  <SelectItem value="admin" className="select-item !bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Admin</SelectItem>
+                  <SelectItem value="manager" className="select-item !bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Manager</SelectItem>
+                  <SelectItem value="it_staff" className="select-item !bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">IT Staff</SelectItem>
+                  <SelectItem value="end_user" className="select-item !bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">End User</SelectItem>
                 </SelectContent>
               </Select>
 
               {/* Status Filter */}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600">
+                <SelectTrigger className="w-40 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 shadow-lg">
-                  <SelectItem value="all" className="hover:bg-gray-100 dark:hover:bg-gray-700">All Status</SelectItem>
-                  <SelectItem value="active" className="hover:bg-gray-100 dark:hover:bg-gray-700">Active</SelectItem>
-                  <SelectItem value="inactive" className="hover:bg-gray-100 dark:hover:bg-gray-700">Inactive</SelectItem>
+                <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                  <SelectItem value="all" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">All Status</SelectItem>
+                  <SelectItem value="active" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Active</SelectItem>
+                  <SelectItem value="inactive" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Inactive</SelectItem>
                 </SelectContent>
               </Select>
 
               {/* Sort Options */}
               <div className="flex gap-2">
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-40 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600">
+                  <SelectTrigger className="w-40 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                     <SelectValue placeholder="Sort By" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 shadow-lg">
-                    <SelectItem value="name" className="hover:bg-gray-100 dark:hover:bg-gray-700">Name</SelectItem>
-                    <SelectItem value="email" className="hover:bg-gray-100 dark:hover:bg-gray-700">Email</SelectItem>
-                    <SelectItem value="role" className="hover:bg-gray-100 dark:hover:bg-gray-700">Role</SelectItem>
-                    <SelectItem value="created" className="hover:bg-gray-100 dark:hover:bg-gray-700">Created Date</SelectItem>
-                    <SelectItem value="last_login" className="hover:bg-gray-100 dark:hover:bg-gray-700">Last Login</SelectItem>
+                  <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                    <SelectItem value="name" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Name</SelectItem>
+                    <SelectItem value="email" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Email</SelectItem>
+                    <SelectItem value="role" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Role</SelectItem>
+                    <SelectItem value="created" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Created Date</SelectItem>
+                    <SelectItem value="last_login" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Last Login</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -775,7 +1017,7 @@ export default function UserManagement() {
                 variant="outline"
                 onClick={handleRefreshData}
                 disabled={usersLoading}
-                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 <RefreshCwIcon className="w-4 h-4 mr-2" />
                 Refresh
@@ -812,75 +1054,20 @@ export default function UserManagement() {
             </div>
           )}
 
-          {/* User Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-                <UsersIcon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{userStats.totalUsers}</div>
-                <p className="text-xs text-muted-foreground">
-                  All registered users
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-                <CheckCircleIcon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{userStats.activeUsers}</div>
-                <p className="text-xs text-muted-foreground">
-                  Currently active users
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Admins</CardTitle>
-                <AlertTriangleIcon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{userStats.roleDistribution.admin || 0}</div>
-                <p className="text-xs text-muted-foreground">
-                  System administrators
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">IT Staff</CardTitle>
-                <UsersIcon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{userStats.roleDistribution.it_staff || 0}</div>
-                <p className="text-xs text-muted-foreground">
-                  IT support staff
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">New Users</CardTitle>
-                <PlusIcon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{userStats.recentRegistrations}</div>
-                <p className="text-xs text-muted-foreground">
-                  Last 30 days
-                </p>
-              </CardContent>
-            </Card>
+          {/* Debug Info */}
+          <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              <strong>Debug Info:</strong> 
+              Total Users: {users?.length || 0} | 
+              Active Users: {users?.filter(u => isUserActive(u)).length || 0} | 
+              Inactive Users: {users?.filter(u => !isUserActive(u)).length || 0} | 
+              Filtered Users: {filteredUsers.length} | 
+              Current Filter: {statusFilter} | 
+              Role Filter: {roleFilter}
+            </div>
           </div>
 
-          {/* Users Table */}
+          {/* User Table */}
           <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -934,9 +1121,9 @@ export default function UserManagement() {
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
-                            {getStatusIcon(user.is_active)}
-                            <span className={user.is_active === false ? "text-red-600" : "text-green-600"}>
-                              {user.is_active === false ? "Inactive" : "Active"}
+                            {getStatusIcon(isUserActive(user))}
+                            <span className={isUserActive(user) ? "text-green-600" : "text-red-600"}>
+                              {isUserActive(user) ? "Active" : "Inactive"}
                             </span>
                           </div>
                         </td>
@@ -975,10 +1162,25 @@ export default function UserManagement() {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => handleUserAction("Toggle Status", user.id)}
+                              className={`${
+                                isUserActive(user) 
+                                  ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-900/20" 
+                                  : "text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
+                              }`}
+                              title={isUserActive(user) ? "Deactivate user account" : "Activate user account"}
+                            >
+                              {isUserActive(user) ? "Deactivate" : "Activate"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleUserAction("Delete", user.id)}
-                              className="text-red-600 hover:text-red-700"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              title="Permanently delete user account"
                             >
                               <TrashIcon className="w-4 h-4" />
+                              Delete
                             </Button>
                           </div>
                         </td>
@@ -1058,9 +1260,9 @@ export default function UserManagement() {
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Status</label>
                       <div className="flex items-center gap-2 mt-1">
-                        {getStatusIcon(selectedUser.is_active)}
-                        <span className={selectedUser.is_active === false ? "text-red-600" : "text-green-600"}>
-                          {selectedUser.is_active === false ? "Inactive" : "Active"}
+                        {getStatusIcon(isUserActive(selectedUser))}
+                        <span className={isUserActive(selectedUser) ? "text-green-600" : "text-red-600"}>
+                          {isUserActive(selectedUser) ? "Active" : "Inactive"}
                         </span>
                       </div>
                     </div>
@@ -1098,8 +1300,13 @@ export default function UserManagement() {
                       <Button
                         variant="outline"
                         onClick={() => handleUserAction("Toggle Status", selectedUser.id)}
+                        className={`${
+                          isUserActive(selectedUser) 
+                            ? "border-orange-500 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20" 
+                            : "border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                        }`}
                       >
-                        {selectedUser.is_active === false ? "Activate" : "Deactivate"}
+                        {isUserActive(selectedUser) ? "Deactivate" : "Activate"}
                       </Button>
                     </div>
                   </div>
@@ -1131,9 +1338,9 @@ export default function UserManagement() {
                         id="firstName"
                         value={editForm.firstName}
                         onChange={(e) => handleEditFormChange("firstName", e.target.value)}
-                        className={`mt-1 ${editErrors.firstName ? 'border-red-500' : ''}`}
+                        className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${editErrors.firstName ? 'border-red-500' : ''}`}
                       />
-                      {editErrors.firstName && <p className="text-red-500 text-xs mt-1">{editErrors.firstName}</p>}
+                      {editErrors.firstName && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{editErrors.firstName}</p>}
                     </div>
                     <div>
                       <Label htmlFor="lastName" className="text-sm font-medium text-muted-foreground">Last Name</Label>
@@ -1141,9 +1348,9 @@ export default function UserManagement() {
                         id="lastName"
                         value={editForm.lastName}
                         onChange={(e) => handleEditFormChange("lastName", e.target.value)}
-                        className={`mt-1 ${editErrors.lastName ? 'border-red-500' : ''}`}
+                        className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${editErrors.lastName ? 'border-red-500' : ''}`}
                       />
-                      {editErrors.lastName && <p className="text-red-500 text-xs mt-1">{editErrors.lastName}</p>}
+                      {editErrors.lastName && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{editErrors.lastName}</p>}
                     </div>
                     <div>
                       <Label htmlFor="email" className="text-sm font-medium text-muted-foreground">Email</Label>
@@ -1152,34 +1359,34 @@ export default function UserManagement() {
                         type="email"
                         value={editForm.email}
                         onChange={(e) => handleEditFormChange("email", e.target.value)}
-                        className={`mt-1 ${editErrors.email ? 'border-red-500' : ''}`}
+                        className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${editErrors.email ? 'border-red-500' : ''}`}
                       />
-                      {editErrors.email && <p className="text-red-500 text-xs mt-1">{editErrors.email}</p>}
+                      {editErrors.email && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{editErrors.email}</p>}
                     </div>
                     <div>
                       <Label htmlFor="role" className="text-sm font-medium text-muted-foreground">Role</Label>
                       <Select value={editForm.role} onValueChange={(value) => handleEditFormChange("role", value)}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-1 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                           <SelectValue placeholder="Select Role" />
                         </SelectTrigger>
-                        <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 shadow-lg">
-                          <SelectItem value="admin" className="hover:bg-gray-100 dark:hover:bg-gray-700">Admin</SelectItem>
-                          <SelectItem value="manager" className="hover:bg-gray-100 dark:hover:bg-gray-700">Manager</SelectItem>
-                          <SelectItem value="it_staff" className="hover:bg-gray-100 dark:hover:bg-gray-700">IT Staff</SelectItem>
-                          <SelectItem value="end_user" className="hover:bg-gray-100 dark:hover:bg-gray-700">End User</SelectItem>
+                        <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                          <SelectItem value="admin" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Admin</SelectItem>
+                          <SelectItem value="manager" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Manager</SelectItem>
+                          <SelectItem value="it_staff" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">IT Staff</SelectItem>
+                          <SelectItem value="end_user" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">End User</SelectItem>
                         </SelectContent>
                       </Select>
-                      {editErrors.role && <p className="text-red-500 text-xs mt-1">{editErrors.role}</p>}
+                      {editErrors.role && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{editErrors.role}</p>}
                     </div>
                     <div>
                       <Label htmlFor="is_active" className="text-sm font-medium text-muted-foreground">Status</Label>
-                      <Select value={editForm.is_active ? "active" : "inactive"} onValueChange={(value) => handleEditFormChange("is_active", value === "active")}>
-                        <SelectTrigger className="mt-1">
+                      <Select value={selectedUser ? (isUserActive(selectedUser) ? "active" : "inactive") : "active"} onValueChange={(value) => handleEditFormChange("is_active", value === "active")}>
+                        <SelectTrigger className="mt-1 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                           <SelectValue placeholder="Select Status" />
                         </SelectTrigger>
-                        <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 shadow-lg">
-                          <SelectItem value="active" className="hover:bg-gray-100 dark:hover:bg-gray-700">Active</SelectItem>
-                          <SelectItem value="inactive" className="hover:bg-gray-100 dark:hover:bg-gray-700">Inactive</SelectItem>
+                        <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                          <SelectItem value="active" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Active</SelectItem>
+                          <SelectItem value="inactive" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Inactive</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1233,10 +1440,10 @@ export default function UserManagement() {
                         id="createFirstName"
                         value={createForm.firstName}
                         onChange={(e) => handleCreateFormChange("firstName", e.target.value)}
-                        className={`mt-1 ${createErrors.firstName ? 'border-red-500' : ''}`}
+                        className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${createErrors.firstName ? 'border-red-500' : ''}`}
                         placeholder="Enter first name"
                       />
-                      {createErrors.firstName && <p className="text-red-500 text-xs mt-1">{createErrors.firstName}</p>}
+                      {createErrors.firstName && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{createErrors.firstName}</p>}
                     </div>
                     <div>
                       <Label htmlFor="createLastName" className="text-sm font-medium text-muted-foreground">Last Name</Label>
@@ -1244,10 +1451,10 @@ export default function UserManagement() {
                         id="createLastName"
                         value={createForm.lastName}
                         onChange={(e) => handleCreateFormChange("lastName", e.target.value)}
-                        className={`mt-1 ${createErrors.lastName ? 'border-red-500' : ''}`}
+                        className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${createErrors.lastName ? 'border-red-500' : ''}`}
                         placeholder="Enter last name"
                       />
-                      {createErrors.lastName && <p className="text-red-500 text-xs mt-1">{createErrors.lastName}</p>}
+                      {createErrors.lastName && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{createErrors.lastName}</p>}
                     </div>
                     <div>
                       <Label htmlFor="createEmail" className="text-sm font-medium text-muted-foreground">Email</Label>
@@ -1256,35 +1463,35 @@ export default function UserManagement() {
                         type="email"
                         value={createForm.email}
                         onChange={(e) => handleCreateFormChange("email", e.target.value)}
-                        className={`mt-1 ${createErrors.email ? 'border-red-500' : ''}`}
+                        className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${createErrors.email ? 'border-red-500' : ''}`}
                         placeholder="Enter email address"
                       />
-                      {createErrors.email && <p className="text-red-500 text-xs mt-1">{createErrors.email}</p>}
+                      {createErrors.email && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{createErrors.email}</p>}
                     </div>
                     <div>
                       <Label htmlFor="createRole" className="text-sm font-medium text-muted-foreground">Role</Label>
                       <Select value={createForm.role} onValueChange={(value) => handleCreateFormChange("role", value)}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-1 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                           <SelectValue placeholder="Select Role" />
                         </SelectTrigger>
-                        <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 shadow-lg">
-                          <SelectItem value="admin" className="hover:bg-gray-100 dark:hover:bg-gray-700">Admin</SelectItem>
-                          <SelectItem value="manager" className="hover:bg-gray-100 dark:hover:bg-gray-700">Manager</SelectItem>
-                          <SelectItem value="it_staff" className="hover:bg-gray-100 dark:hover:bg-gray-700">IT Staff</SelectItem>
-                          <SelectItem value="end_user" className="hover:bg-gray-100 dark:hover:bg-gray-700">End User</SelectItem>
+                        <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                          <SelectItem value="admin" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Admin</SelectItem>
+                          <SelectItem value="manager" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Manager</SelectItem>
+                          <SelectItem value="it_staff" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">IT Staff</SelectItem>
+                          <SelectItem value="end_user" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">End User</SelectItem>
                         </SelectContent>
                       </Select>
-                      {createErrors.role && <p className="text-red-500 text-xs mt-1">{createErrors.role}</p>}
+                      {createErrors.role && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{createErrors.role}</p>}
                     </div>
                     <div>
                       <Label htmlFor="createStatus" className="text-sm font-medium text-muted-foreground">Status</Label>
                       <Select value={createForm.is_active ? "active" : "inactive"} onValueChange={(value) => handleCreateFormChange("is_active", value === "active")}>
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className="mt-1 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                           <SelectValue placeholder="Select Status" />
                         </SelectTrigger>
-                        <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 shadow-lg">
-                          <SelectItem value="active" className="hover:bg-gray-100 dark:hover:bg-gray-700">Active</SelectItem>
-                          <SelectItem value="inactive" className="hover:bg-gray-100 dark:hover:bg-gray-700">Inactive</SelectItem>
+                        <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                          <SelectItem value="active" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Active</SelectItem>
+                          <SelectItem value="inactive" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Inactive</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

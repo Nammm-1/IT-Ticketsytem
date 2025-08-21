@@ -204,6 +204,83 @@ export class EmailService {
     }
   }
 
+  // Ticket event emails
+  async sendTicketCreatedEmail(params: { to: string; ticketTitle: string; ticketId: string; ticketUrl: string }): Promise<{ success: boolean; message: string }> {
+    const { to, ticketTitle, ticketId, ticketUrl } = params;
+    const subject = `Ticket Created: ${ticketTitle}`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2 style="background:#2563eb;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0;">Ticket Created</h2>
+        <div style="background:#f8fafc;padding:16px;border-radius:0 0 8px 8px;">
+          <p>Your ticket <strong>${ticketTitle}</strong> has been created.</p>
+          <p><a href="${ticketUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">View Ticket</a></p>
+          <p style="color:#64748b;font-size:12px;">Ticket ID: ${ticketId}</p>
+        </div>
+      </div>
+    `;
+    const text = `Ticket Created\n\nYour ticket "${ticketTitle}" has been created.\n\nOpen: ${ticketUrl}\nTicket ID: ${ticketId}`;
+    return this.sendGeneric(to, subject, html, text);
+  }
+
+  async sendTicketAssignedEmail(params: { to: string; ticketTitle: string; ticketId: string; ticketUrl: string; assigneeName?: string }): Promise<{ success: boolean; message: string }> {
+    const { to, ticketTitle, ticketId, ticketUrl, assigneeName } = params;
+    const subject = `Ticket Assigned: ${ticketTitle}`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2 style="background:#0ea5e9;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0;">Ticket Assigned</h2>
+        <div style="background:#f8fafc;padding:16px;border-radius:0 0 8px 8px;">
+          <p>${assigneeName ? `${assigneeName} has been assigned` : 'You have been assigned'} to ticket <strong>${ticketTitle}</strong>.</p>
+          <p><a href="${ticketUrl}" style="display:inline-block;background:#0ea5e9;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">View Ticket</a></p>
+          <p style="color:#64748b;font-size:12px;">Ticket ID: ${ticketId}</p>
+        </div>
+      </div>
+    `;
+    const text = `Ticket Assigned\n\nTicket: "${ticketTitle}"\n${assigneeName ? `${assigneeName} has been assigned.` : 'You have been assigned.'}\n\nOpen: ${ticketUrl}\nTicket ID: ${ticketId}`;
+    return this.sendGeneric(to, subject, html, text);
+  }
+
+  async sendTicketCommentEmail(params: { to: string; ticketTitle: string; ticketId: string; ticketUrl: string; commenterName?: string }): Promise<{ success: boolean; message: string }> {
+    const { to, ticketTitle, ticketId, ticketUrl, commenterName } = params;
+    const subject = `New Comment: ${ticketTitle}`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2 style="background:#16a34a;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0;">New Comment</h2>
+        <div style="background:#f8fafc;padding:16px;border-radius:0 0 8px 8px;">
+          <p>${commenterName ? `<strong>${commenterName}</strong> added a comment` : 'A new comment was added'} on <strong>${ticketTitle}</strong>.</p>
+          <p><a href="${ticketUrl}" style="display:inline-block;background:#16a34a;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">View Ticket</a></p>
+          <p style="color:#64748b;font-size:12px;">Ticket ID: ${ticketId}</p>
+        </div>
+      </div>
+    `;
+    const text = `New Comment\n\n${commenterName ? `${commenterName} added a comment` : 'A new comment was added'} on "${ticketTitle}".\n\nOpen: ${ticketUrl}\nTicket ID: ${ticketId}`;
+    return this.sendGeneric(to, subject, html, text);
+  }
+
+  private async sendGeneric(to: string, subject: string, html: string, text: string): Promise<{ success: boolean; message: string }> {
+    try {
+      if (this.isConfigured) {
+        await this.transporter.sendMail({
+          from: `"IT Support System" <${process.env.SMTP_USER}>`,
+          to,
+          subject,
+          html,
+          text,
+        });
+        return { success: true, message: 'Email sent' };
+      } else {
+        console.log('\n📧 === EMAIL (Console Fallback) ===');
+        console.log(`To: ${to}`);
+        console.log(`Subject: ${subject}`);
+        console.log(`\n${text}`);
+        console.log('===================================\n');
+        return { success: true, message: 'Console email logged' };
+      }
+    } catch (error) {
+      console.error('❌ Failed to send ticket email:', error);
+      return { success: false, message: 'Failed to send email' };
+    }
+  }
+
   private createUserCreationEmailTemplate(emailData: UserCreationEmail & { tempPassword: string }) {
     const html = `
       <!DOCTYPE html>

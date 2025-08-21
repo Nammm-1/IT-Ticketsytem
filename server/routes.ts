@@ -1,12 +1,17 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { emailService } from "./emailService";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertTicketSchema, insertCommentSchema, insertKnowledgeArticleSchema, insertAttachmentSchema } from "@shared/schema";
 import { z } from "z";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { users } from "../shared/schema";
 
 // Configure multer for file uploads
 const storageConfig = multer.diskStorage({
@@ -52,8 +57,30 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Simple Server-Sent Events (SSE) hub
+  const sseClients = new Set<any>();
+  const sseBroadcast = (event: any) => {
+    const payload = `data: ${JSON.stringify(event)}\n\n`;
+    for (const client of sseClients) {
+      try { client.write(payload); } catch {}
+    }
+  };
+
   // Auth middleware
   await setupAuth(app);
+  // Realtime events stream (SSE)
+  app.get('/api/events', isAuthenticated, (req: any, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+    res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+    sseClients.add(res);
+    req.on('close', () => {
+      sseClients.delete(res);
+      try { res.end(); } catch {}
+    });
+  });
 
   // Helper: get user ID from session (session-based auth only)
   const getUserId = (req: any): string => {
@@ -85,6 +112,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const ticket = await storage.createTicket(ticketData);
+      // Broadcast ticket created
+      sseBroadcast({ type: 'ticket_created', ticketId: ticket.id });
+      // Notify creator
+      try {
+        await storage.createNotification({
+          userId,
+          type: 'ticket_created',
+          title: 'Ticket Created',
+          message: `Your ticket "${ticket.title}" was created successfully`,
+          data: { ticketId: ticket.id },
+        } as any);
+        sseBroadcast({ type: 'notification', userId, ticketId: ticket.id });
+        // Email creator
+        const creator = await storage.getUser(userId);
+        if (creator?.email) {
+          const ticketUrl = `${req.protocol}://${req.get('host')}/ticket/${ticket.id}`;
+          await emailService.sendTicketCreatedEmail({
+            to: creator.email,
+            ticketTitle: ticket.title,
+            ticketId: ticket.id,
+            ticketUrl,
+          });
+        }
+        // Notify all IT staff (email + in-app), so anyone can pick it up
+        try {
+          const allUsers = await storage.getAllUsers();
+          const itStaff = allUsers.filter(u => u.role === 'it_staff' && u.email);
+          const ticketUrlForStaff = `${req.protocol}://${req.get('host')}/ticket/${ticket.id}`;
+          for (const staff of itStaff) {
+            if (staff.id !== userId) {
+              await storage.createNotification({
+                userId: staff.id,
+                type: 'ticket_new_unassigned',
+                title: 'New Ticket Submitted',
+                message: `New ticket "${ticket.title}" requires triage`,
+                data: { ticketId: ticket.id },
+              } as any);
+              sseBroadcast({ type: 'notification', userId: staff.id, ticketId: ticket.id });
+              await emailService.sendTicketCreatedEmail({
+                to: staff.email!,
+                ticketTitle: ticket.title,
+                ticketId: ticket.id,
+                ticketUrl: ticketUrlForStaff,
+              });
+            }
+          }
+        } catch (e) { console.warn('Notify IT staff failed:', e); }
+      } catch (e) { console.warn('Notif ticket_created failed:', e); }
       res.json(ticket);
     } catch (error) {
       console.error("Error creating ticket:", error);
@@ -237,6 +312,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedToId,
         status: 'in_progress' // Automatically change status when assigned
       });
+      sseBroadcast({ type: 'ticket_assigned', ticketId: ticket.id, assignedToId });
+      // Notify assignee and creator
+      try {
+        await storage.createNotification({
+          userId: assignedToId,
+          type: 'ticket_assigned',
+          title: 'New Ticket Assigned',
+          message: `You have been assigned ticket "${ticket.title}"`,
+          data: { ticketId: ticket.id },
+        } as any);
+        sseBroadcast({ type: 'notification', userId: assignedToId, ticketId: ticket.id });
+        await storage.createNotification({
+          userId: ticket.createdById,
+          type: 'ticket_assigned_creator',
+          title: 'Ticket Assigned',
+          message: `Your ticket "${ticket.title}" was assigned to ${assignedUser.firstName || assignedUser.email}`,
+          data: { ticketId: ticket.id },
+        } as any);
+        sseBroadcast({ type: 'notification', userId: ticket.createdById, ticketId: ticket.id });
+        // Emails
+        const ticketUrl = `${req.protocol}://${req.get('host')}/ticket/${ticket.id}`;
+        const assignee = await storage.getUser(assignedToId);
+        if (assignee?.email) {
+          await emailService.sendTicketAssignedEmail({ to: assignee.email, ticketTitle: ticket.title, ticketId: ticket.id, ticketUrl });
+        }
+        const creator = await storage.getUser(ticket.createdById);
+        if (creator?.email) {
+          const assigneeName = assignee?.firstName || assignee?.email || 'IT Staff';
+          await emailService.sendTicketAssignedEmail({ to: creator.email, ticketTitle: ticket.title, ticketId: ticket.id, ticketUrl, assigneeName });
+        }
+      } catch (e) { console.warn('Notif ticket_assigned failed:', e); }
       
       res.json(ticket);
     } catch (error) {
@@ -272,6 +378,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const comment = await storage.addComment(commentData);
+      sseBroadcast({ type: 'ticket_commented', ticketId: ticket.id });
+      // Notify creator and assignee (if different than commenter)
+      try {
+        const targets = new Set<string>();
+        if (ticket.createdById) targets.add(ticket.createdById);
+        if (ticket.assignedToId) targets.add(ticket.assignedToId);
+        targets.delete(userId);
+        for (const targetUserId of targets) {
+          await storage.createNotification({
+            userId: targetUserId,
+            type: 'ticket_commented',
+            title: 'New Comment',
+            message: `New comment on ticket "${ticket.title}"`,
+            data: { ticketId: ticket.id },
+          } as any);
+          sseBroadcast({ type: 'notification', userId: targetUserId, ticketId: ticket.id });
+          const targetUser = await storage.getUser(targetUserId);
+          if (targetUser?.email) {
+            const commenter = await storage.getUser(userId);
+            const commenterName = commenter?.firstName || commenter?.email;
+            const ticketUrl = `${req.protocol}://${req.get('host')}/ticket/${ticket.id}`;
+            await emailService.sendTicketCommentEmail({ to: targetUser.email, ticketTitle: ticket.title, ticketId: ticket.id, ticketUrl, commenterName });
+          }
+        }
+      } catch (e) { console.warn('Notif ticket_commented failed:', e); }
       res.json(comment);
     } catch (error) {
       console.error("Error adding comment:", error);
@@ -503,6 +634,220 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching SLA performance:", error);
       res.status(500).json({ message: "Failed to fetch SLA performance" });
+    }
+  });
+
+  // Notifications API
+  app.get('/api/notifications', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const onlyUnread = (req.query.unread === 'true');
+      const notifications = await storage.getUserNotifications(userId, onlyUnread, 50);
+      res.json(notifications);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      res.status(500).json({ message: 'Failed to fetch notifications' });
+    }
+  });
+
+  app.post('/api/notifications/:id/read', isAuthenticated, async (req: any, res) => {
+    try {
+      const notificationId = req.params.id;
+      await storage.markNotificationRead(notificationId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      res.status(500).json({ message: 'Failed to update notification' });
+    }
+  });
+
+  // User Management API
+  app.get('/api/users', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      
+      // Only admins can view all users
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Admin role required." });
+      }
+      
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ message: 'Failed to fetch users' });
+    }
+  });
+
+  app.post('/api/users', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      
+      // Only admins can create users
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Admin role required." });
+      }
+      
+      const { firstName, lastName, email, role, is_active = true } = req.body;
+      
+      // Validate required fields
+      if (!firstName || !lastName || !email || !role) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+      
+      // Create user
+      const newUser = await storage.createUser({
+        firstName,
+        lastName,
+        email,
+        role,
+        is_active
+      });
+      
+      // Send welcome email using the correct method
+      let emailResult = { success: false, message: "Email service not available" };
+      try {
+        emailResult = await emailService.sendUserCreationEmail({
+          to: email,
+          firstName,
+          lastName,
+          email,
+          tempPassword: "temp123", // This should be generated properly
+          loginUrl: `${req.protocol}://${req.get('host')}/api/login`
+        });
+      } catch (emailError) {
+        console.error('Email service error:', emailError);
+        emailResult = { success: false, message: "Failed to send welcome email" };
+      }
+      
+      res.status(201).json({
+        ...newUser,
+        emailResult
+      });
+    } catch (error) {
+      console.error('Error creating user:', error);
+      res.status(500).json({ message: 'Failed to create user' });
+    }
+  });
+
+  app.put('/api/users/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      
+      // Only admins can update users
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Admin role required." });
+      }
+      
+      const targetUserId = req.params.id;
+      const updateData = req.body;
+      
+      console.log(`API: Updating user ${targetUserId}`);
+      console.log(`API: Raw request body:`, req.body);
+      console.log(`API: Parsed updateData:`, updateData);
+      console.log(`API: updateData keys:`, Object.keys(updateData));
+      console.log(`API: is_active value:`, updateData.is_active);
+      console.log(`API: Type of is_active:`, typeof updateData.is_active);
+      console.log(`API: Action type:`, updateData._action);
+      
+      // If this is a toggle request, ensure is_active is included
+      if (updateData._action === 'toggle_status') {
+        console.log(`API: Processing toggle status request for user ${targetUserId}`);
+        if (typeof updateData.is_active === 'undefined') {
+          console.log(`API: ERROR: is_active field missing from toggle request!`);
+          return res.status(400).json({ message: 'Missing is_active field for toggle request' });
+        }
+        console.log(`API: Toggle request validated - is_active: ${updateData.is_active}`);
+      }
+      
+      // Remove the action marker before updating
+      const cleanUpdateData = { ...updateData };
+      delete cleanUpdateData._action;
+      
+      // Update user
+      const updatedUser = await storage.updateUser(targetUserId, cleanUpdateData);
+      console.log(`API: User ${targetUserId} updated successfully:`, updatedUser);
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      res.status(500).json({ message: 'Failed to update user' });
+    }
+  });
+
+  // Dedicated endpoint for toggling user status (bypasses broken update logic)
+  app.patch('/api/users/:id/toggle-status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const adminUser = await storage.getUser(userId);
+      
+      // Only admins can toggle user status
+      if (!adminUser || adminUser.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Admin role required." });
+      }
+      
+      const targetUserId = req.params.id;
+      const targetUser = await storage.getUser(targetUserId);
+      
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Toggle the status
+      const newStatus = targetUser.is_active === 1 ? 0 : 1;
+      
+      console.log(`🔧 TOGGLE STATUS: User ${targetUser.email} status changing from ${targetUser.is_active} to ${newStatus}`);
+      
+      // Use direct Drizzle update to bypass the broken update logic
+      const [updatedUser] = await db
+        .update(users)
+        .set({ 
+          is_active: newStatus, 
+          updatedAt: new Date() 
+        })
+        .where(eq(users.id, targetUserId))
+        .returning();
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      console.log(`🔧 TOGGLE STATUS: Successfully updated user ${targetUser.email} to status ${newStatus}`);
+      
+      res.json({
+        success: true,
+        message: `User ${targetUser.email} is now ${newStatus === 1 ? 'active' : 'inactive'}`,
+        user: updatedUser,
+        newStatus: newStatus
+      });
+      
+    } catch (error) {
+      console.error('Error toggling user status:', error);
+      res.status(500).json({ message: 'Failed to toggle user status' });
+    }
+  });
+
+  app.delete('/api/users/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      
+      // Only admins can delete users
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Admin role required." });
+      }
+      
+      const targetUserId = req.params.id;
+      
+      // Delete user completely
+      await storage.deleteUser(targetUserId);
+      res.json({ success: true, message: "User deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ message: 'Failed to delete user' });
     }
   });
 

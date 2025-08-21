@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
@@ -18,6 +19,21 @@ import UserManagement from "@/pages/user-management";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      const es = new EventSource('/api/events');
+      es.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg?.type === 'notification') {
+            // lightweight strategy: refetch auth user endpoint triggers header polling soon
+            fetch('/api/notifications?unread=true', { credentials: 'include' }).catch(() => {});
+          }
+        } catch {}
+      };
+      return () => { es.close(); };
+    }
+  }, [isLoading, isAuthenticated]);
 
   return (
     <Switch>

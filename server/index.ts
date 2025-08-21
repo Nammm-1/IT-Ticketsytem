@@ -14,6 +14,8 @@ app.use((req, res, next) => {
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
     capturedJsonResponse = bodyJson;
+    // Ensure Content-Type is set to application/json
+    res.setHeader('Content-Type', 'application/json');
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 

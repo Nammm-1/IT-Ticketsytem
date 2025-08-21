@@ -55,6 +55,14 @@ export default function Sidebar() {
     return roleMap[role as keyof typeof roleMap] || "User";
   };
 
+  const navigationItems = [
+    { href: "/", label: "Dashboard", icon: HomeIcon },
+    { href: "/create-ticket", label: "Create Ticket", icon: PlusCircleIcon },
+    { href: "/tickets", label: user?.role === 'end_user' ? 'My Tickets' : 'All Tickets', icon: ListIcon },
+    { href: "/knowledge-base", label: "Knowledge Base", icon: BookOpenIcon },
+    { href: "/reports", label: "Reports", icon: BarChart3Icon },
+  ];
+
   return (
     <div className="w-64 bg-white dark:bg-gray-800 shadow-lg fixed h-full z-10 border-r border-gray-200 dark:border-gray-700">
       {/* Header */}
@@ -77,8 +85,8 @@ export default function Sidebar() {
             <Button
               variant="ghost"
               className={cn(
-                "w-full justify-start",
-                isActive("/") && "bg-blue-50 dark:bg-blue-900/20 text-primary border-r-2 border-primary"
+                "w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md",
+                isActive("/") && "bg-primary/10 dark:bg-primary/20 text-primary border-l-4 border-primary"
               )}
               data-testid="nav-dashboard"
             >
@@ -93,8 +101,8 @@ export default function Sidebar() {
               <Button
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start",
-                  isActive("/create-ticket") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
+                  "w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md",
+                  isActive("/create-ticket") && "bg-primary/10 dark:bg-primary/20 text-primary border-l-4 border-primary"
                 )}
                 data-testid="nav-create-ticket"
               >
@@ -104,14 +112,15 @@ export default function Sidebar() {
             </Link>
           )}
           
+ 
 
           
           <Link href="/tickets">
             <Button
               variant="ghost"
               className={cn(
-                "w-full justify-start",
-                isActive("/tickets") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
+                "w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md",
+                isActive("/tickets") && "bg-primary/10 dark:bg-primary/20 text-primary border-l-4 border-primary"
               )}
               data-testid="nav-my-tickets"
             >
@@ -124,8 +133,8 @@ export default function Sidebar() {
             <Button
               variant="ghost"
               className={cn(
-                "w-full justify-start",
-                isActive("/knowledge-base") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
+                "w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md",
+                isActive("/knowledge-base") && "bg-primary/10 dark:bg-primary/20 text-primary border-l-4 border-primary"
               )}
               data-testid="nav-knowledge-base"
             >
@@ -139,8 +148,8 @@ export default function Sidebar() {
               <Button
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start",
-                  isActive("/reports") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
+                  "w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md",
+                  isActive("/reports") && "bg-primary/10 dark:bg-primary/20 text-primary border-l-4 border-primary"
                 )}
                 data-testid="nav-reports"
               >
@@ -162,8 +171,8 @@ export default function Sidebar() {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start",
-                    isActive("/ticket-queue") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
+                    "w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md",
+                    isActive("/ticket-queue") && "bg-primary/10 dark:bg-primary/20 text-primary border-l-4 border-primary"
                   )}
                   data-testid="nav-ticket-queue"
                 >
@@ -176,8 +185,8 @@ export default function Sidebar() {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start",
-                    isActive("/team-workload") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
+                    "w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md",
+                    isActive("/team-workload") && "bg-primary/10 dark:bg-primary/20 text-primary border-l-4 border-primary"
                   )}
                   data-testid="nav-team-workload"
                 >
@@ -196,19 +205,19 @@ export default function Sidebar() {
               Admin Tools
             </h3>
             <div className="space-y-2">
-                             <Link href="/user-management">
-                 <Button
-                   variant="ghost"
-                   className={cn(
-                     "w-full justify-start",
-                     isActive("/user-management") && "bg-blue-50 dark:bg-blue-900/20 text-primary"
-                   )}
-                   data-testid="nav-user-management"
-                 >
-                   <UsersIcon className="w-5 h-5 mr-3" />
-                   View All Users
-                 </Button>
-               </Link>
+              <Link href="/user-management">
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md",
+                    isActive("/user-management") && "bg-primary/10 dark:bg-primary/20 text-primary border-l-4 border-primary"
+                  )}
+                  data-testid="nav-user-management"
+                >
+                  <UsersIcon className="w-5 h-5 mr-3" />
+                  View All Users
+                </Button>
+              </Link>
               
               <Button
                 variant="ghost"

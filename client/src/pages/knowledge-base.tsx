@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SearchIcon, BookOpenIcon, TagIcon } from "lucide-react";
+import { SearchIcon, BookOpenIcon, TagIcon, PlusIcon } from "lucide-react";
 import { KnowledgeArticle } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 
@@ -19,6 +19,78 @@ export default function KnowledgeBase() {
   const { isAuthenticated, isLoading } = useAuth();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingArticle, setEditingArticle] = useState<KnowledgeArticle | null>(null);
+
+  // Inject CSS to fix transparent dropdowns and other UI elements
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      /* Force opaque backgrounds for all UI components */
+      .select-content, .select-item, .select-trigger,
+      [data-radix-popper-content-wrapper],
+      .bg-red-50, .bg-blue-50, .bg-yellow-50, .bg-green-50,
+      .dark .bg-red-900\\/20, .dark .bg-blue-900\\/20, .dark .bg-yellow-900\\/20, .dark .bg-green-900\\/20,
+      .bg-white, .dark .bg-gray-800,
+      .bg-gray-50, .dark .bg-gray-900,
+      .bg-primary, .bg-secondary,
+      .bg-destructive, .bg-muted,
+      .bg-popover, .bg-card,
+      .bg-accent, .bg-accent-foreground {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Force opaque borders */
+      .border, .border-red-200, .border-blue-200, .border-yellow-200, .border-green-200,
+      .dark .border-red-800, .dark .border-blue-800, .dark .border-yellow-800, .dark .border-green-800,
+      .border-gray-300, .dark .border-gray-600 {
+        border-color: var(--border) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Force opaque text */
+      .text-red-500, .text-blue-600, .text-yellow-600, .text-green-600,
+      .dark .text-red-400, .dark .text-blue-400, .dark .text-yellow-400, .dark .text-green-400 {
+        color: var(--foreground) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Ensure modals and overlays are opaque */
+      .fixed.inset-0.bg-black.bg-opacity-50,
+      .bg-white, .dark .bg-gray-800,
+      .bg-gray-50, .dark .bg-gray-900 {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Fix any remaining transparent elements */
+      .bg-opacity-50, .bg-opacity-20, .bg-opacity-10 {
+        opacity: 1 !important;
+      }
+      
+      /* Ensure form elements have proper backgrounds */
+      input, select, textarea, button {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Fix modal backgrounds */
+      .modal, .dialog, .popover, .tooltip {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   // Redirect to login if not authenticated - Knowledge base is public but we still want auth for better UX
   useEffect(() => {
@@ -113,16 +185,16 @@ export default function KnowledgeBase() {
                   Category
                 </label>
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-48" data-testid="select-article-category">
+                  <SelectTrigger className="w-48 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm" data-testid="select-article-category">
                     <SelectValue placeholder="All categories" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All categories</SelectItem>
-                    <SelectItem value="hardware">Hardware</SelectItem>
-                    <SelectItem value="software">Software</SelectItem>
-                    <SelectItem value="network">Network</SelectItem>
-                    <SelectItem value="access">Access</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                  <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                    <SelectItem value="all" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">All categories</SelectItem>
+                    <SelectItem value="hardware" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Hardware</SelectItem>
+                    <SelectItem value="software" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Software</SelectItem>
+                    <SelectItem value="network" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Network</SelectItem>
+                    <SelectItem value="access" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Access</SelectItem>
+                    <SelectItem value="other" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -149,10 +221,10 @@ export default function KnowledgeBase() {
               ))
             ) : articles && articles.length > 0 ? (
               articles.map((article: KnowledgeArticle) => (
-                <Card key={article.id} className="hover:shadow-md transition-shadow cursor-pointer" data-testid={`card-article-${article.id}`}>
+                <Card key={article.id} className="hover:shadow-lg transition-all duration-200 ease-in-out cursor-pointer" data-testid={`card-article-${article.id}`}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
-                      <CardTitle className="text-lg leading-6">{article.title}</CardTitle>
+                      <CardTitle className="text-lg leading-6 hover:text-primary transition-colors duration-200">{article.title}</CardTitle>
                       <Badge className={getCategoryColor(article.category)}>
                         {article.category}
                       </Badge>
@@ -220,7 +292,7 @@ export default function KnowledgeBase() {
                   <Button
                     key={item.category}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200 ease-in-out hover:shadow-md"
                     onClick={() => setCategoryFilter(item.category)}
                     data-testid={`button-category-${item.category}`}
                   >

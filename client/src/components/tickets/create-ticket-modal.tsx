@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,76 @@ export default function CreateTicketModal({ open, onOpenChange }: CreateTicketMo
     category: "",
     priority: "",
   });
+
+  // Inject CSS to fix transparent dropdowns and other UI elements
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      /* Force opaque backgrounds for all UI components */
+      .select-content, .select-item, .select-trigger,
+      [data-radix-popper-content-wrapper],
+      .bg-red-50, .bg-blue-50, .bg-yellow-50, .bg-green-50,
+      .dark .bg-red-900\\/20, .dark .bg-blue-900\\/20, .dark .bg-yellow-900\\/20, .dark .bg-green-900\\/20,
+      .bg-white, .dark .bg-gray-800,
+      .bg-gray-50, .dark .bg-gray-900,
+      .bg-primary, .bg-secondary,
+      .bg-destructive, .bg-muted,
+      .bg-popover, .bg-card,
+      .bg-accent, .bg-accent-foreground {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Force opaque borders */
+      .border, .border-red-200, .border-blue-200, .border-yellow-200, .border-green-200,
+      .dark .border-red-800, .dark .border-blue-800, .dark .border-yellow-800, .dark .border-green-800,
+      .border-gray-300, .dark .border-gray-600 {
+        border-color: var(--border) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Force opaque text */
+      .text-red-500, .text-blue-600, .text-yellow-600, .text-green-600,
+      .dark .text-red-400, .dark .text-blue-400, .dark .text-yellow-400, .dark .text-green-400 {
+        color: var(--foreground) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Ensure modals and overlays are opaque */
+      .fixed.inset-0.bg-black.bg-opacity-50,
+      .bg-white, .dark .bg-gray-800,
+      .bg-gray-50, .dark .bg-gray-900 {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Fix any remaining transparent elements */
+      .bg-opacity-50, .bg-opacity-20, .bg-opacity-10 {
+        opacity: 1 !important;
+      }
+      
+      /* Ensure form elements have proper backgrounds */
+      input, select, textarea, button {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+      
+      /* Fix modal backgrounds */
+      .modal, .dialog, .popover, .tooltip {
+        background-color: var(--background) !important;
+        background: var(--background) !important;
+        opacity: 1 !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const createTicketMutation = useMutation({
     mutationFn: async (ticketData: typeof formData) => {
@@ -107,15 +177,15 @@ export default function CreateTicketModal({ open, onOpenChange }: CreateTicketMo
                 Category *
               </label>
               <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
-                <SelectTrigger data-testid="select-modal-ticket-category">
+                <SelectTrigger data-testid="select-modal-ticket-category" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="hardware">Hardware</SelectItem>
-                  <SelectItem value="software">Software</SelectItem>
-                  <SelectItem value="network">Network</SelectItem>
-                  <SelectItem value="access">Access</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                  <SelectItem value="hardware" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Hardware</SelectItem>
+                  <SelectItem value="software" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Software</SelectItem>
+                  <SelectItem value="network" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Network</SelectItem>
+                  <SelectItem value="access" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Access</SelectItem>
+                  <SelectItem value="other" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -125,14 +195,14 @@ export default function CreateTicketModal({ open, onOpenChange }: CreateTicketMo
                 Priority *
               </label>
               <Select value={formData.priority} onValueChange={(value) => handleInputChange("priority", value)}>
-                <SelectTrigger data-testid="select-modal-ticket-priority">
+                <SelectTrigger data-testid="select-modal-ticket-priority" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
+                <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                  <SelectItem value="low" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Low</SelectItem>
+                  <SelectItem value="medium" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Medium</SelectItem>
+                  <SelectItem value="high" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">High</SelectItem>
+                  <SelectItem value="critical" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Critical</SelectItem>
                 </SelectContent>
               </Select>
             </div>

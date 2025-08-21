@@ -31,6 +31,58 @@ export default function CreateTicket() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
 
+  // Inject CSS to force dropdown backgrounds to be opaque
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .select-content {
+        background-color: white !important;
+        background: white !important;
+        opacity: 1 !important;
+      }
+      .dark .select-content {
+        background-color: rgb(31, 41, 55) !important;
+        background: rgb(31, 41, 55) !important;
+        opacity: 1 !important;
+      }
+      .select-item {
+        background-color: white !important;
+        background: white !important;
+        opacity: 1 !important;
+      }
+      .dark .select-item {
+        background-color: rgb(31, 41, 55) !important;
+        background: rgb(31, 41, 55) !important;
+        opacity: 1 !important;
+      }
+      .select-trigger {
+        background-color: white !important;
+        background: white !important;
+        opacity: 1 !important;
+      }
+      .dark .select-trigger {
+        background-color: rgb(31, 41, 55) !important;
+        background: rgb(31, 41, 55) !important;
+        opacity: 1 !important;
+      }
+      [data-radix-popper-content-wrapper] {
+        background-color: white !important;
+        background: white !important;
+        opacity: 1 !important;
+      }
+      .dark [data-radix-popper-content-wrapper] {
+        background-color: rgb(31, 41, 55) !important;
+        background: rgb(31, 41, 55) !important;
+        opacity: 1 !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -217,15 +269,15 @@ export default function CreateTicket() {
                         Category *
                       </label>
                       <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
-                        <SelectTrigger data-testid="select-ticket-category">
+                        <SelectTrigger data-testid="select-ticket-category" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="hardware">Hardware</SelectItem>
-                          <SelectItem value="software">Software</SelectItem>
-                          <SelectItem value="network">Network</SelectItem>
-                          <SelectItem value="access">Access</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
+                        <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                          <SelectItem value="hardware" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Hardware</SelectItem>
+                          <SelectItem value="software" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Software</SelectItem>
+                          <SelectItem value="network" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Network</SelectItem>
+                          <SelectItem value="access" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Access</SelectItem>
+                          <SelectItem value="other" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Other</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -235,14 +287,14 @@ export default function CreateTicket() {
                         Priority *
                       </label>
                       <Select value={formData.priority} onValueChange={(value) => handleInputChange("priority", value)}>
-                        <SelectTrigger data-testid="select-ticket-priority">
+                        <SelectTrigger data-testid="select-ticket-priority" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
                           <SelectValue placeholder="Select priority" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="critical">Critical</SelectItem>
+                        <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                          <SelectItem value="low" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Low</SelectItem>
+                          <SelectItem value="medium" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Medium</SelectItem>
+                          <SelectItem value="high" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">High</SelectItem>
+                          <SelectItem value="critical" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Critical</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -336,14 +388,19 @@ export default function CreateTicket() {
                   </div>
 
                   <div className="flex justify-end space-x-3 pt-4">
-                    <Link href="/tickets">
-                      <Button type="button" variant="outline" data-testid="button-cancel-ticket">
-                        Cancel
-                      </Button>
-                    </Link>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setLocation("/tickets")}
+                      className="transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md"
+                      data-testid="button-cancel-ticket"
+                    >
+                      Cancel
+                    </Button>
                     <Button 
                       type="submit" 
                       disabled={createTicketMutation.isPending}
+                      className="transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-lg disabled:hover:transform-none disabled:hover:shadow-none"
                       data-testid="button-submit-ticket"
                     >
                       {createTicketMutation.isPending ? "Creating..." : "Create Ticket"}

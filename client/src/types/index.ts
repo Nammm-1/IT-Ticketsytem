@@ -7,7 +7,7 @@ export interface User {
   createdAt?: string;
   updatedAt?: string;
   last_login?: string;
-  is_active?: boolean;
+  is_active?: boolean | number;
 }
 
 export interface Ticket {

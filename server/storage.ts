@@ -4,6 +4,7 @@ import {
   ticketComments,
   knowledgeArticles,
   ticketAttachments,
+  notifications,
   type User,
   type UpsertUser,
   type InsertTicket,
@@ -15,6 +16,8 @@ import {
   type KnowledgeArticle,
   type InsertAttachment,
   type TicketAttachment,
+  type InsertNotification,
+  type Notification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, sql, ilike, count } from "drizzle-orm";
@@ -25,6 +28,7 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<UpsertUser>): Promise<User>;
   createUser(user: UpsertUser): Promise<User>;
+  deleteUser(id: string): Promise<void>;
   
   // Ticket operations
   createTicket(ticket: InsertTicket): Promise<Ticket>;
@@ -83,6 +87,11 @@ export interface IStorage {
     high: { percentage: number };
     medium: { percentage: number };
   }>;
+  
+  // Notification operations
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getUserNotifications(userId: string, onlyUnread?: boolean, limit?: number): Promise<Notification[]>;
+  markNotificationRead(notificationId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -118,11 +127,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: string, updates: Partial<UpsertUser>): Promise<User> {
+    console.log(`Storage: Updating user ${id} with data:`, updates);
+    console.log(`Storage: Updates object keys:`, Object.keys(updates));
+    console.log(`Storage: is_active value in updates:`, updates.is_active);
+    console.log(`Storage: Type of is_active:`, typeof updates.is_active);
+    
+    // Ensure updatedAt is always set
+    const updateData = { ...updates, updatedAt: new Date() };
+    console.log(`Storage: Final update data:`, updateData);
+    
     const [user] = await db
       .update(users)
-      .set({ ...updates, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(users.id, id))
       .returning();
+    
+    console.log(`Storage: User ${id} updated successfully. Result:`, user);
+    console.log(`Storage: Final is_active value:`, user.is_active);
     return user;
   }
 
@@ -132,6 +153,17 @@ export class DatabaseStorage implements IStorage {
       .values(userData)
       .returning();
     return user;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    console.log(`Storage: Attempting to delete user with ID: ${id}`);
+    try {
+      await db.delete(users).where(eq(users.id, id));
+      console.log(`Storage: User ${id} successfully deleted from database`);
+    } catch (error) {
+      console.error(`Storage: Error deleting user ${id}:`, error);
+      throw error;
+    }
   }
 
   // Ticket operations
@@ -498,6 +530,27 @@ export class DatabaseStorage implements IStorage {
       high: { percentage: 87 },
       medium: { percentage: 96 },
     };
+  }
+
+  // Notifications
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [row] = await db.insert(notifications).values(notification).returning();
+    return row;
+  }
+
+  async getUserNotifications(userId: string, onlyUnread = false, limit = 20): Promise<Notification[]> {
+    const where = onlyUnread ? and(eq(notifications.userId, userId), eq(notifications.isRead, 0)) : eq(notifications.userId, userId);
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(where)
+      .orderBy(desc(notifications.createdAt))
+      .limit(limit);
+    return rows as unknown as Notification[];
+  }
+
+  async markNotificationRead(notificationId: string): Promise<void> {
+    await db.update(notifications).set({ isRead: 1 }).where(eq(notifications.id, notificationId));
   }
 }
 
