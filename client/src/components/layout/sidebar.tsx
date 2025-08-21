@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import { 
   TicketIcon, 
   HomeIcon, 
@@ -12,12 +13,48 @@ import {
   InboxIcon,
   UsersIcon,
   SettingsIcon,
-  LogOutIcon
+  LogOutIcon,
+  UserIcon,
+  RefreshCwIcon
 } from "lucide-react";
 
 export default function Sidebar() {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, isLoading, refetch } = useAuth();
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  const handleRefreshProfile = () => {
+    console.log('🔄 Manual refresh triggered');
+    setRefreshKey((prev: number) => prev + 1);
+    refetch();
+  };
+  
+  // Refresh user data when sidebar mounts to ensure we have the latest info
+  useEffect(() => {
+    if (user) {
+      console.log('🔄 Refreshing user data for:', user.email);
+      console.log('👤 Current user data:', { firstName: user.firstName, lastName: user.lastName, email: user.email });
+      refetch();
+    }
+  }, [user?.id]); // Refresh when user ID changes
+  
+  // Listen for user profile updates
+  useEffect(() => {
+    const handleUserProfileUpdate = (event: CustomEvent) => {
+      console.log('📡 User profile update event received:', event.detail);
+      if (event.detail.userId === user?.id) {
+        console.log('🔄 Triggering refresh due to profile update');
+        setRefreshKey(prev => prev + 1);
+        refetch();
+      }
+    };
+    
+    window.addEventListener('userProfileUpdated', handleUserProfileUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('userProfileUpdated', handleUserProfileUpdate as EventListener);
+    };
+  }, [user?.id, refetch]);
 
   const isActive = (path: string) => {
     if (path === "/" && location === "/") return true;
@@ -26,26 +63,29 @@ export default function Sidebar() {
   };
 
   const getInitials = (user: any) => {
-    if (user?.firstName && user?.lastName) {
+    if (!user) return "U";
+    if (user.firstName && user.lastName) {
       return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
     }
-    if (user?.email) {
+    if (user.email && typeof user.email === 'string') {
       return user.email.slice(0, 2).toUpperCase();
     }
     return "U";
   };
 
   const getUserName = (user: any) => {
-    if (user?.firstName && user?.lastName) {
+    if (!user) return "User";
+    if (user.firstName && user.lastName) {
       return `${user.firstName} ${user.lastName}`;
     }
-    if (user?.email) {
+    if (user.email && typeof user.email === 'string') {
       return user.email;
     }
     return "User";
   };
 
   const getRoleDisplay = (role: string) => {
+    if (!role) return "User";
     const roleMap = {
       end_user: "End User",
       it_staff: "IT Support Staff",
@@ -58,22 +98,47 @@ export default function Sidebar() {
   const navigationItems = [
     { href: "/", label: "Dashboard", icon: HomeIcon },
     { href: "/create-ticket", label: "Create Ticket", icon: PlusCircleIcon },
-    { href: "/tickets", label: user?.role === 'end_user' ? 'My Tickets' : 'All Tickets', icon: ListIcon },
+    { href: "/tickets", label: user && user.role === 'end_user' ? 'My Tickets' : 'All Tickets', icon: ListIcon },
     { href: "/knowledge-base", label: "Knowledge Base", icon: BookOpenIcon },
     { href: "/reports", label: "Reports", icon: BarChart3Icon },
   ];
 
+  // Don't render sidebar until user data is loaded
+  if (isLoading || !user) {
+    return (
+      <div className="w-64 bg-white dark:bg-gray-800 shadow-lg fixed h-full z-10 border-r border-gray-200 dark:border-gray-700">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center space-x-3">
+          <div className="w-18 h-14 flex items-center justify-center">
+            <img src="/bsu-logo_yllw-flame-blk-text.png" alt="Bowie State University" className="w-18 h-14" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Bowie State University</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">IT Support</p>
+          </div>
+        </div>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-64 bg-white dark:bg-gray-800 shadow-lg fixed h-full z-10 border-r border-gray-200 dark:border-gray-700">
+    <div 
+      key={`sidebar-${user?.id}-${user?.firstName}-${user?.lastName}-${refreshKey}`} 
+      className="w-64 bg-white dark:bg-gray-800 shadow-lg fixed h-full z-10 border-r border-gray-200 dark:border-gray-700"
+    >
       {/* Header */}
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <TicketIcon className="w-6 h-6 text-white" />
+          <div className="w-16 h-16 flex items-center justify-center">
+            <img src="/bsu-logo_yllw-flame-blk-text.png" alt="Bowie State University" className="w-18 h-16" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">IT Support</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Ticketing System</p>
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Bowie State University</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">IT Support</p>
           </div>
         </div>
       </div>
@@ -219,14 +284,19 @@ export default function Sidebar() {
                 </Button>
               </Link>
               
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                data-testid="nav-system-settings"
-              >
-                <SettingsIcon className="w-5 h-5 mr-3" />
-                System Settings
-              </Button>
+              <Link href="/system-settings">
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full justify-start text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md",
+                    isActive("/system-settings") && "bg-primary/10 dark:bg-primary/20 text-primary border-l-4 border-primary"
+                  )}
+                  data-testid="nav-account-settings"
+                >
+                  <UserIcon className="w-5 h-5 mr-3" />
+                  Account Settings
+                </Button>
+              </Link>
             </div>
           </div>
         )}
@@ -248,15 +318,27 @@ export default function Sidebar() {
               {user?.role ? getRoleDisplay(user.role) : "User"}
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="p-1"
-            onClick={() => window.location.href = '/api/logout'}
-            data-testid="button-logout"
-          >
-            <LogOutIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-          </Button>
+          <div className="flex items-center space-x-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-1"
+              onClick={handleRefreshProfile}
+              title="Refresh Profile"
+              data-testid="button-refresh-profile"
+            >
+              <RefreshCwIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-1"
+              onClick={() => window.location.href = '/api/logout'}
+              data-testid="button-logout"
+            >
+              <LogOutIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

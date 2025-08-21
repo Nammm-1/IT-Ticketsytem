@@ -29,7 +29,8 @@ import {
   SortDescIcon,
   SaveIcon,
   XIcon,
-  KeyIcon
+  KeyIcon,
+  CalendarIcon
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -1043,12 +1044,12 @@ export default function UserManagement() {
 
           {/* Error State */}
           {usersError && (
-            <div className="mb-8 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
+            <div className="mb-8 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg p-4 shadow-sm">
+              <div className="flex items-center gap-2 text-red-800 dark:text-red-100">
                 <AlertTriangleIcon className="w-5 h-5" />
                 <span className="font-medium">Error loading users</span>
               </div>
-              <p className="text-red-700 dark:text-red-300 text-sm mt-1">
+              <p className="text-red-700 dark:text-red-200 text-sm mt-1">
                 {usersError instanceof Error ? usersError.message : 'Failed to load user data'}
               </p>
             </div>
@@ -1142,6 +1143,8 @@ export default function UserManagement() {
                                 setSelectedUser(user);
                                 setShowUserDetails(true);
                               }}
+                              className="hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 hover:text-blue-700"
+                              title="View user details"
                             >
                               <EyeIcon className="w-4 h-4" />
                             </Button>
@@ -1149,28 +1152,10 @@ export default function UserManagement() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleUserAction("Edit", user.id)}
+                              className="hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600 hover:text-green-700"
+                              title="Edit user"
                             >
                               <EditIcon className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleUserAction("Reset Password", user.id)}
-                            >
-                              Reset Password
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleUserAction("Toggle Status", user.id)}
-                              className={`${
-                                isUserActive(user) 
-                                  ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-900/20" 
-                                  : "text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
-                              }`}
-                              title={isUserActive(user) ? "Deactivate user account" : "Activate user account"}
-                            >
-                              {isUserActive(user) ? "Deactivate" : "Activate"}
                             </Button>
                             <Button
                               variant="ghost"
@@ -1219,96 +1204,139 @@ export default function UserManagement() {
 
           {/* User Details Modal */}
           {showUserDetails && selectedUser && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold">User Details</h2>
+            <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-md flex items-center justify-center z-50">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 dark:border-gray-700">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">User Details</h2>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">View and manage user information</p>
+                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowUserDetails(false)}
+                    className="h-10 w-10 p-0 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
                   >
-                    <XCircleIcon className="w-5 h-5" />
+                    <XIcon className="w-5 h-5" />
                   </Button>
                 </div>
                 
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
-                      <span className="text-foreground text-xl font-medium">
+                {/* User Profile Section */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6 mb-8 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-6">
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <span className="text-white text-2xl font-bold">
                         {selectedUser.firstName?.[0]}{selectedUser.lastName?.[0] || selectedUser.email[0].toUpperCase()}
                       </span>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-medium">
+                    <div className="flex-1">
+                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                         {selectedUser.firstName && selectedUser.lastName 
                           ? `${selectedUser.firstName} ${selectedUser.lastName}`
                           : "No Name Set"
                         }
                       </h3>
-                      <p className="text-muted-foreground">{selectedUser.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Role</label>
-                      <Badge className={`mt-1 ${getRoleColor(selectedUser.role)}`}>
-                        {selectedUser.role?.replace('_', ' ') || 'Unknown Role'}
-                      </Badge>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Status</label>
-                      <div className="flex items-center gap-2 mt-1">
-                        {getStatusIcon(isUserActive(selectedUser))}
-                        <span className={isUserActive(selectedUser) ? "text-green-600" : "text-red-600"}>
-                          {isUserActive(selectedUser) ? "Active" : "Inactive"}
-                        </span>
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                        <MailIcon className="w-4 h-4" />
+                        <span className="text-lg">{selectedUser.email}</span>
                       </div>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Created</label>
-                      <p className="mt-1">{formatDateTime(selectedUser.createdAt)}</p>
+                  </div>
+                </div>
+
+                {/* User Information Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  {/* Role Card */}
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
+                        <UsersIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Role</span>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Last Login</label>
-                      <p className="mt-1">{formatDateTime(selectedUser.last_login)}</p>
-                    </div>
+                    <Badge className={`text-sm px-3 py-1 ${getRoleColor(selectedUser.role)}`}>
+                      {selectedUser.role?.replace('_', ' ') || 'Unknown Role'}
+                    </Badge>
                   </div>
 
-                  <div className="pt-4 border-t">
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => handleUserAction("Edit", selectedUser.id)}
-                      >
-                        <EditIcon className="w-4 h-4 mr-2" />
-                        Edit User
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => handleUserAction("Reset Password", selectedUser.id)}
-                        disabled={resetPasswordMutation.isPending}
-                      >
-                        {resetPasswordMutation.isPending ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mx-auto"></div>
-                        ) : (
-                          <KeyIcon className="w-4 h-4 mr-2" />
-                        )}
-                        Reset Password
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => handleUserAction("Toggle Status", selectedUser.id)}
-                        className={`${
-                          isUserActive(selectedUser) 
-                            ? "border-orange-500 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20" 
-                            : "border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
-                        }`}
-                      >
-                        {isUserActive(selectedUser) ? "Deactivate" : "Activate"}
-                      </Button>
+                  {/* Status Card */}
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                        {getStatusIcon(isUserActive(selectedUser))}
+                      </div>
+                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</span>
                     </div>
+                    <span className={`text-sm font-medium ${
+                      isUserActive(selectedUser) ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                    }`}>
+                      {isUserActive(selectedUser) ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                  {/* Created Date Card */}
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                        <CalendarIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Created</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {formatDateTime(selectedUser.createdAt)}
+                    </span>
+                  </div>
+
+                  {/* Last Login Card */}
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
+                        <KeyIcon className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Last Login</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {formatDateTime(selectedUser.last_login)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleUserAction("Edit", selectedUser.id)}
+                      className="flex-1 h-12 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-gray-300 dark:border-gray-600"
+                    >
+                      <EditIcon className="w-4 h-4 mr-2" />
+                      Edit User
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleUserAction("Reset Password", selectedUser.id)}
+                      disabled={resetPasswordMutation.isPending}
+                      className="flex-1 h-12 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-gray-300 dark:border-gray-600"
+                    >
+                      {resetPasswordMutation.isPending ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mx-auto"></div>
+                      ) : (
+                        <KeyIcon className="w-4 h-4 mr-2" />
+                      )}
+                      Reset Password
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleUserAction("Toggle Status", selectedUser.id)}
+                      className={`flex-1 h-12 ${
+                        isUserActive(selectedUser) 
+                          ? "border-orange-500 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 bg-orange-50 dark:bg-orange-900/20" 
+                          : "border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 bg-green-50 dark:bg-green-900/20"
+                      }`}
+                    >
+                      {isUserActive(selectedUser) ? "Deactivate" : "Activate"}
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1317,57 +1345,139 @@ export default function UserManagement() {
 
           {/* Edit User Modal */}
           {showEditModal && selectedUser && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold">Edit User</h2>
+            <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-md flex items-center justify-center z-50">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 dark:border-gray-700">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Edit User</h2>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">Update user information and settings</p>
+                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setShowEditModal(false)}
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setSelectedUser(null);
+                      setEditForm({
+                        firstName: "",
+                        lastName: "",
+                        email: "",
+                        role: "",
+                        is_active: true
+                      });
+                      setEditErrors({
+                        firstName: "",
+                        lastName: "",
+                        email: "",
+                        role: ""
+                      });
+                    }}
+                    className="h-10 w-10 p-0 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
                   >
                     <XIcon className="w-5 h-5" />
                   </Button>
                 </div>
+
+                {/* User Profile Preview */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6 mb-8 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <span className="text-white text-xl font-bold">
+                        {selectedUser.firstName?.[0]}{selectedUser.lastName?.[0] || selectedUser.email[0].toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                        {selectedUser.firstName && selectedUser.lastName 
+                          ? `${selectedUser.firstName} ${selectedUser.lastName}`
+                          : "No Name Set"
+                        }
+                      </h3>
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                        <MailIcon className="w-4 h-4" />
+                        <span className="text-base">{selectedUser.email}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 
-                <form onSubmit={handleEditSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="firstName" className="text-sm font-medium text-muted-foreground">First Name</Label>
+                <form onSubmit={handleEditSubmit} className="space-y-6">
+                  {/* Form Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* First Name */}
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <UsersIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        First Name
+                      </Label>
                       <Input
                         id="firstName"
                         value={editForm.firstName}
                         onChange={(e) => handleEditFormChange("firstName", e.target.value)}
-                        className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${editErrors.firstName ? 'border-red-500' : ''}`}
+                        className={`h-12 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${editErrors.firstName ? 'border-red-500 ring-red-200' : ''}`}
+                        placeholder="Enter first name"
                       />
-                      {editErrors.firstName && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{editErrors.firstName}</p>}
+                      {editErrors.firstName && (
+                        <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm">
+                          <AlertTriangleIcon className="w-4 h-4" />
+                          <span>{editErrors.firstName}</span>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <Label htmlFor="lastName" className="text-sm font-medium text-muted-foreground">Last Name</Label>
+
+                    {/* Last Name */}
+                    <div className="space-y-2">
+                      <Label htmlFor="lastName" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <UsersIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        Last Name
+                      </Label>
                       <Input
                         id="lastName"
                         value={editForm.lastName}
                         onChange={(e) => handleEditFormChange("lastName", e.target.value)}
-                        className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${editErrors.lastName ? 'border-red-500' : ''}`}
+                        className={`h-12 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${editErrors.lastName ? 'border-red-500 ring-red-200' : ''}`}
+                        placeholder="Enter last name"
                       />
-                      {editErrors.lastName && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{editErrors.lastName}</p>}
+                      {editErrors.lastName && (
+                        <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm">
+                          <AlertTriangleIcon className="w-4 h-4" />
+                          <span>{editErrors.lastName}</span>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <Label htmlFor="email" className="text-sm font-medium text-muted-foreground">Email</Label>
+
+                    {/* Email */}
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <MailIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        Email Address
+                      </Label>
                       <Input
                         id="email"
                         type="email"
                         value={editForm.email}
                         onChange={(e) => handleEditFormChange("email", e.target.value)}
-                        className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${editErrors.email ? 'border-red-500' : ''}`}
+                        className={`h-12 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 ${editErrors.email ? 'border-red-500 ring-red-200' : ''}`}
+                        placeholder="Enter email address"
                       />
-                      {editErrors.email && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{editErrors.email}</p>}
+                      {editErrors.email && (
+                        <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm">
+                          <AlertTriangleIcon className="w-4 h-4" />
+                          <span>{editErrors.email}</span>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <Label htmlFor="role" className="text-sm font-medium text-muted-foreground">Role</Label>
+
+                    {/* Role */}
+                    <div className="space-y-2">
+                      <Label htmlFor="role" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <UsersIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        User Role
+                      </Label>
                       <Select value={editForm.role} onValueChange={(value) => handleEditFormChange("role", value)}>
-                        <SelectTrigger className="mt-1 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
-                          <SelectValue placeholder="Select Role" />
+                        <SelectTrigger className="h-12 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200">
+                          <SelectValue placeholder="Select user role" />
                         </SelectTrigger>
                         <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
                           <SelectItem value="admin" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Admin</SelectItem>
@@ -1376,13 +1486,27 @@ export default function UserManagement() {
                           <SelectItem value="end_user" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">End User</SelectItem>
                         </SelectContent>
                       </Select>
-                      {editErrors.role && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{editErrors.role}</p>}
+                      {editErrors.role && (
+                        <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm">
+                          <AlertTriangleIcon className="w-4 h-4" />
+                          <span>{editErrors.role}</span>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <Label htmlFor="is_active" className="text-sm font-medium text-muted-foreground">Status</Label>
+
+                    {/* Status */}
+                    <div className="space-y-2">
+                      <Label htmlFor="is_active" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        {isUserActive(selectedUser) ? (
+                          <CheckCircleIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <XCircleIcon className="w-4 h-4 text-red-600 dark:text-red-400" />
+                        )}
+                        Account Status
+                      </Label>
                       <Select value={selectedUser ? (isUserActive(selectedUser) ? "active" : "inactive") : "active"} onValueChange={(value) => handleEditFormChange("is_active", value === "active")}>
-                        <SelectTrigger className="mt-1 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
-                          <SelectValue placeholder="Select Status" />
+                        <SelectTrigger className="h-12 !bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                          <SelectValue placeholder="Select account status" />
                         </SelectTrigger>
                         <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
                           <SelectItem value="active" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Active</SelectItem>
@@ -1392,24 +1516,29 @@ export default function UserManagement() {
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2">
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
                     <Button
                       variant="outline"
                       onClick={() => setShowEditModal(false)}
                       disabled={isSubmitting}
+                      className="flex-1 h-12 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
                     >
                       Cancel
                     </Button>
                     <Button
                       type="submit"
                       disabled={isSubmitting}
+                      className="flex-1 h-12 bg-black hover:bg-gray-800 text-black shadow-lg hover:shadow-xl transition-all duration-200"
                     >
                       {isSubmitting ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto"></div>
                       ) : (
-                        <SaveIcon className="w-4 h-4 mr-2" />
+                        <>
+                          <SaveIcon className="w-4 h-4 mr-2" />
+                          Save Changes
+                        </>
                       )}
-                      Save Changes
                     </Button>
                   </div>
                 </form>
@@ -1419,8 +1548,8 @@ export default function UserManagement() {
 
           {/* Create User Modal */}
           {showCreateModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-md flex items-center justify-center z-50">
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold">Create New User</h2>
                   <Button
@@ -1443,7 +1572,7 @@ export default function UserManagement() {
                         className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${createErrors.firstName ? 'border-red-500' : ''}`}
                         placeholder="Enter first name"
                       />
-                      {createErrors.firstName && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{createErrors.firstName}</p>}
+                      {createErrors.firstName && <p className="text-red-600 text-xs mt-1 bg-red-100 dark:bg-red-900 px-2 py-1 rounded border border-red-300 dark:border-red-700">{createErrors.firstName}</p>}
                     </div>
                     <div>
                       <Label htmlFor="createLastName" className="text-sm font-medium text-muted-foreground">Last Name</Label>
@@ -1454,7 +1583,7 @@ export default function UserManagement() {
                         className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${createErrors.lastName ? 'border-red-500' : ''}`}
                         placeholder="Enter last name"
                       />
-                      {createErrors.lastName && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{createErrors.lastName}</p>}
+                      {createErrors.lastName && <p className="text-red-600 text-xs mt-1 bg-red-100 dark:bg-red-900 px-2 py-1 rounded border border-red-300 dark:border-red-700">{createErrors.lastName}</p>}
                     </div>
                     <div>
                       <Label htmlFor="createEmail" className="text-sm font-medium text-muted-foreground">Email</Label>
@@ -1466,7 +1595,7 @@ export default function UserManagement() {
                         className={`mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${createErrors.email ? 'border-red-500' : ''}`}
                         placeholder="Enter email address"
                       />
-                      {createErrors.email && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{createErrors.email}</p>}
+                      {createErrors.email && <p className="text-red-600 text-xs mt-1 bg-red-100 dark:bg-red-900 px-2 py-1 rounded border border-red-300 dark:border-red-700">{createErrors.email}</p>}
                     </div>
                     <div>
                       <Label htmlFor="createRole" className="text-sm font-medium text-muted-foreground">Role</Label>
@@ -1481,7 +1610,7 @@ export default function UserManagement() {
                           <SelectItem value="end_user" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">End User</SelectItem>
                         </SelectContent>
                       </Select>
-                      {createErrors.role && <p className="text-red-500 text-xs mt-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800">{createErrors.role}</p>}
+                      {createErrors.role && <p className="text-red-600 text-xs mt-1 bg-red-100 dark:bg-red-900 px-2 py-1 rounded border border-red-300 dark:border-red-700">{createErrors.role}</p>}
                     </div>
                     <div>
                       <Label htmlFor="createStatus" className="text-sm font-medium text-muted-foreground">Status</Label>

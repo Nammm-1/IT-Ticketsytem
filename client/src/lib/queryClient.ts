@@ -47,7 +47,7 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 5 * 60 * 1000, // 5 minutes - shorter stale time for user data
       retry: false,
     },
     mutations: {
@@ -55,3 +55,10 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Utility function to invalidate user cache
+export const invalidateUserCache = () => {
+  console.log('🔄 Invalidating user cache...');
+  queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+  console.log('✅ User cache invalidated');
+};

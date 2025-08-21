@@ -43,8 +43,18 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  password: varchar("password"), // Store hashed passwords
   role: userRoleEnum('role').default('end_user').notNull(),
   is_active: integer('is_active').default(1).notNull(),
+  // User account settings
+  phone: varchar("phone"),
+  timezone: varchar("timezone").default('UTC'),
+  language: varchar("language").default('en'),
+  theme: varchar("theme").default('auto'),
+  compactMode: integer("compact_mode").default(0), // 0 = false, 1 = true
+  emailNotifications: integer("email_notifications").default(1), // 0 = false, 1 = true
+  pushNotifications: integer("push_notifications").default(1), // 0 = false, 1 = true
+  smsNotifications: integer("sms_notifications").default(0), // 0 = false, 1 = true
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

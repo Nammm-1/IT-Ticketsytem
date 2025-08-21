@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
+import Login from "@/pages/login";
+import ForgotPassword from "@/pages/forgot-password";
 import Dashboard from "@/pages/dashboard";
 import Tickets from "@/pages/tickets";
 import CreateTicket from "@/pages/create-ticket";
@@ -16,9 +18,16 @@ import TicketQueue from "@/pages/ticket-queue";
 import Reports from "@/pages/reports";
 import TeamWorkload from "@/pages/team-workload";
 import UserManagement from "@/pages/user-management";
+import SystemSettings from "@/pages/system-settings";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 Router Debug:', { isAuthenticated, isLoading, user });
+  }, [isAuthenticated, isLoading, user]);
+  
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
       const es = new EventSource('/api/events');
@@ -38,7 +47,11 @@ function Router() {
   return (
     <Switch>
       {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
+        <>
+          <Route path="/" component={Landing} />
+          <Route path="/login" component={Login} />
+          <Route path="/forgot-password" component={ForgotPassword} />
+        </>
       ) : (
         <>
           <Route path="/" component={Dashboard} />
@@ -50,6 +63,7 @@ function Router() {
           <Route path="/reports" component={Reports} />
           <Route path="/team-workload" component={TeamWorkload} />
           <Route path="/user-management" component={UserManagement} />
+          <Route path="/system-settings" component={SystemSettings} />
         </>
       )}
       <Route component={NotFound} />

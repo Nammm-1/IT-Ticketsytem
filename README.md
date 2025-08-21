@@ -1,6 +1,6 @@
-# 🎫 IT Department Ticketing System
+# 🎫 Bowie State University - IT Support Ticketing System
 
-A comprehensive, full-stack IT support ticketing system built with modern web technologies. Streamline your IT support process with a centralized platform for creating, tracking, and resolving IT-related issues.
+A comprehensive, full-stack IT support ticketing system built with modern web technologies for Bowie State University. Streamline your IT support process with a centralized platform for creating, tracking, and resolving IT-related issues.
 
 ## ✨ Features
 
@@ -323,6 +323,3 @@ MIT License - see LICENSE file for details.
 
 ---
 
-**Built with ❤️ using modern web technologies for reliable IT support management.**
-
-*This system is designed to be easily deployable while maintaining enterprise-grade security and performance.*

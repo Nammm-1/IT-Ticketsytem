@@ -582,6 +582,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/knowledge-base/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      
+      // Only IT staff, managers, and admins can edit knowledge articles
+      if (!user || !['it_staff', 'manager', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const articleId = req.params.id;
+      const existingArticle = await storage.getKnowledgeArticle(articleId);
+      
+      if (!existingArticle) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+      
+      const articleData = insertKnowledgeArticleSchema.partial().parse({
+        ...req.body,
+        updatedAt: new Date(),
+      });
+      
+      const updatedArticle = await storage.updateKnowledgeArticle(articleId, articleData);
+      res.json(updatedArticle);
+    } catch (error) {
+      console.error("Error updating knowledge article:", error);
+      res.status(400).json({ message: "Failed to update knowledge article" });
+    }
+  });
+
+  app.delete('/api/knowledge-base/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      
+      // Only IT staff, managers, and admins can delete knowledge articles
+      if (!user || !['it_staff', 'manager', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const articleId = req.params.id;
+      const existingArticle = await storage.getKnowledgeArticle(articleId);
+      
+      if (!existingArticle) {
+        return res.status(404).json({ message: "Article not found" });
+      }
+      
+      await storage.deleteKnowledgeArticle(articleId);
+      res.json({ message: "Article deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting knowledge article:", error);
+      res.status(500).json({ message: "Failed to delete knowledge article" });
+    }
+  });
+
   // Analytics routes
   app.get('/api/analytics/metrics', isAuthenticated, async (req: any, res) => {
     try {
@@ -851,6 +906,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user by ID (users can only access their own data)
+  app.get('/api/users/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      console.log('GET /api/users/:id - Session userId:', userId, 'Requested id:', req.params.id);
+      
+      const requestingUser = await storage.getUser(userId);
+      console.log('Requesting user found:', !!requestingUser, 'User ID:', requestingUser?.id);
+      
+      // Users can only access their own data
+      if (!requestingUser || requestingUser.id !== req.params.id) {
+        console.log('Access denied - ID mismatch:', { sessionId: userId, requestedId: req.params.id, userDbId: requestingUser?.id });
+        return res.status(403).json({ message: "Access denied. You can only view your own data." });
+      }
+      
+      const userData = await storage.getUser(req.params.id);
+      if (!userData) {
+        console.log('User not found in database for ID:', req.params.id);
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      console.log('Successfully returning user data for ID:', req.params.id);
+      res.json(userData);
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      res.status(500).json({ message: 'Failed to fetch user data' });
+    }
+  });
+
   // Get IT staff for assignment
   app.get('/api/users/it-staff', isAuthenticated, async (req: any, res) => {
     try {
@@ -867,6 +951,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching IT staff:", error);
       res.status(500).json({ message: "Failed to fetch IT staff" });
+    }
+  });
+
+  // User Settings Routes
+  app.get('/api/users/:id/settings', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      console.log('GET /api/users/:id/settings - Session userId:', userId, 'Requested id:', req.params.id);
+      
+      const requestingUser = await storage.getUser(userId);
+      console.log('Requesting user found:', !!requestingUser, 'User ID:', requestingUser?.id);
+      
+      // Users can only access their own settings
+      if (!requestingUser || requestingUser.id !== req.params.id) {
+        console.log('Access denied - ID mismatch:', { sessionId: userId, requestedId: req.params.id, userDbId: requestingUser?.id });
+        return res.status(403).json({ message: "Access denied. You can only view your own settings." });
+      }
+      
+      const userSettings = await storage.getUserSettings(req.params.id);
+      if (!userSettings) {
+        console.log('User settings not found in database for ID:', req.params.id);
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      console.log('Successfully returning user settings for ID:', req.params.id);
+      res.json(userSettings);
+    } catch (error) {
+      console.error('Error fetching user settings:', error);
+      res.status(500).json({ message: 'Failed to fetch user settings' });
+    }
+  });
+
+  app.put('/api/users/:id/settings', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const requestingUser = await storage.getUser(userId);
+      
+      // Users can only update their own settings
+      if (!requestingUser || requestingUser.id !== req.params.id) {
+        return res.status(403).json({ message: "Access denied. You can only update your own settings." });
+      }
+      
+      const updateData = req.body;
+      
+      // Only allow updating specific settings fields
+      const allowedFields = [
+        'firstName', 'lastName', 'email', 'phone', 'timezone', 'language', 
+        'theme', 'compactMode', 'emailNotifications', 'pushNotifications', 'smsNotifications'
+      ];
+      
+      const filteredUpdates: any = {};
+      allowedFields.forEach(field => {
+        if (updateData.hasOwnProperty(field)) {
+          // Convert boolean fields to integers for database
+          if (['compactMode', 'emailNotifications', 'pushNotifications', 'smsNotifications'].includes(field)) {
+            filteredUpdates[field] = updateData[field] ? 1 : 0;
+          } else {
+            filteredUpdates[field] = updateData[field];
+          }
+        }
+      });
+      
+      if (Object.keys(filteredUpdates).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+      
+      const updatedUser = await storage.updateUserSettings(req.params.id, filteredUpdates);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error('Error updating user settings:', error);
+      res.status(500).json({ message: 'Failed to update user settings' });
+    }
+  });
+
+  app.put('/api/users/:id/password', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const requestingUser = await storage.getUser(userId);
+      
+      // Users can only change their own password
+      if (!requestingUser || requestingUser.id !== req.params.id) {
+        return res.status(403).json({ message: "Access denied. You can only change your own password." });
+      }
+      
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current password and new password are required" });
+      }
+      
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "New password must be at least 8 characters long" });
+      }
+      
+      // In a real app, you would verify the current password here
+      // For now, we'll simulate successful password change
+      const success = await storage.updateUserPassword(req.params.id, currentPassword, newPassword);
+      
+      if (success) {
+        res.json({ message: "Password updated successfully" });
+      } else {
+        res.status(400).json({ message: "Failed to update password" });
+      }
+    } catch (error) {
+      console.error('Error changing password:', error);
+      res.status(500).json({ message: 'Failed to change password' });
     }
   });
 

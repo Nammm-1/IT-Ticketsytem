@@ -347,12 +347,12 @@ export default function Reports() {
 
           {/* Error State */}
           {ticketsError && (
-            <div className="mb-8 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
+            <div className="mb-8 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg p-4 shadow-sm">
+              <div className="flex items-center gap-2 text-red-800 dark:text-red-100">
                 <AlertTriangleIcon className="w-5 h-5" />
                 <span className="font-medium">Error loading tickets</span>
               </div>
-              <p className="text-red-700 dark:text-red-300 text-sm mt-1">
+              <p className="text-red-700 dark:text-red-200 text-sm mt-1">
                 {ticketsError instanceof Error ? ticketsError.message : 'Failed to load ticket data'}
               </p>
             </div>

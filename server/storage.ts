@@ -30,6 +30,11 @@ export interface IStorage {
   createUser(user: UpsertUser): Promise<User>;
   deleteUser(id: string): Promise<void>;
   
+  // User settings operations
+  getUserSettings(id: string): Promise<User | undefined>;
+  updateUserSettings(id: string, updates: Partial<UpsertUser>): Promise<User>;
+  updateUserPassword(id: string, currentPassword: string, newPassword: string): Promise<boolean>;
+  
   // Ticket operations
   createTicket(ticket: InsertTicket): Promise<Ticket>;
   getTicket(id: string): Promise<TicketWithRelations | undefined>;
@@ -60,6 +65,8 @@ export interface IStorage {
     offset?: number;
   }): Promise<KnowledgeArticle[]>;
   getKnowledgeArticle(id: string): Promise<KnowledgeArticle | undefined>;
+  updateKnowledgeArticle(id: string, updates: Partial<InsertKnowledgeArticle>): Promise<KnowledgeArticle>;
+  deleteKnowledgeArticle(id: string): Promise<void>;
   
   // Attachment operations
   addAttachment(attachment: InsertAttachment): Promise<TicketAttachment>;
@@ -163,6 +170,67 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error(`Storage: Error deleting user ${id}:`, error);
       throw error;
+    }
+  }
+
+  // User settings operations
+  async getUserSettings(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async updateUserSettings(id: string, updates: Partial<UpsertUser>): Promise<User> {
+    console.log(`Storage: Updating user settings for ${id} with data:`, updates);
+    
+    // Ensure updatedAt is always set
+    const updateData = { ...updates, updatedAt: new Date() };
+    
+    const [user] = await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, id))
+      .returning();
+    
+    console.log(`Storage: User settings ${id} updated successfully. Result:`, user);
+    return user;
+  }
+
+  async updateUserPassword(id: string, currentPassword: string, newPassword: string): Promise<boolean> {
+    try {
+      console.log(`Storage: Updating password for user ${id}`);
+      
+      // Get current user to verify current password
+      const currentUser = await this.getUser(id);
+      if (!currentUser) {
+        console.log(`Storage: User ${id} not found`);
+        return false;
+      }
+      
+      // For development, accept any current password if user has no stored password
+      // In production, you would hash and verify the current password
+      if (currentUser.password && currentUser.password !== currentPassword) {
+        console.log(`Storage: Current password verification failed for user ${id}`);
+        return false;
+      }
+      
+      // Update the user's password (in production, hash the new password)
+      const [user] = await db
+        .update(users)
+        .set({ 
+          password: newPassword, // In production, hash this
+          updatedAt: new Date() 
+        })
+        .where(eq(users.id, id))
+        .returning();
+      
+      if (user) {
+        console.log(`Storage: Password updated successfully for user ${id}`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error(`Storage: Error updating password for user ${id}:`, error);
+      return false;
     }
   }
 
@@ -378,6 +446,19 @@ export class DatabaseStorage implements IStorage {
   async getKnowledgeArticle(id: string): Promise<KnowledgeArticle | undefined> {
     const [article] = await db.select().from(knowledgeArticles).where(eq(knowledgeArticles.id, id));
     return article;
+  }
+
+  async updateKnowledgeArticle(id: string, updates: Partial<InsertKnowledgeArticle>): Promise<KnowledgeArticle> {
+    const [updatedArticle] = await db
+      .update(knowledgeArticles)
+      .set(updates)
+      .where(eq(knowledgeArticles.id, id))
+      .returning();
+    return updatedArticle;
+  }
+
+  async deleteKnowledgeArticle(id: string): Promise<void> {
+    await db.delete(knowledgeArticles).where(eq(knowledgeArticles.id, id));
   }
 
   // Attachment operations

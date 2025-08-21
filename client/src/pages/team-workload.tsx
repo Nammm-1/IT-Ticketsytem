@@ -395,12 +395,12 @@ export default function TeamWorkload() {
 
           {/* Error State */}
           {teamError && (
-            <div className="mb-8 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
+            <div className="mb-8 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg p-4 shadow-sm">
+              <div className="flex items-center gap-2 text-red-800 dark:text-red-100">
                 <AlertTriangleIcon className="w-5 h-5" />
                 <span className="font-medium">Error loading team data</span>
               </div>
-              <p className="text-red-700 dark:text-red-300 text-sm mt-1">
+              <p className="text-red-700 dark:text-red-200 text-sm mt-1">
                 {teamError instanceof Error ? teamError.message : 'Failed to load team workload data'}
               </p>
             </div>
@@ -525,7 +525,7 @@ export default function TeamWorkload() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-red-100 dark:bg-red-900 rounded-lg border border-red-300 dark:border-red-700">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                       <span className="text-sm font-medium">Overloaded</span>

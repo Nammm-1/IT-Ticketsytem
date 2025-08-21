@@ -1,348 +1,340 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { isUnauthorizedError } from "@/lib/authUtils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlusIcon, SearchIcon, FilterIcon } from "lucide-react";
-import { Link } from "wouter";
-import TicketCard from "@/components/tickets/ticket-card";
-import { Ticket } from "@/types";
+import { 
+  PlusIcon, 
+  SearchIcon,
+  FilterIcon,
+  TicketIcon,
+  ClockIcon,
+  AlertTriangleIcon,
+  CalendarIcon,
+  UserIcon
+} from "lucide-react";
+
+interface Ticket {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  category: string;
+  createdBy: string;
+  assignedTo: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export default function Tickets() {
-  const { toast } = useToast();
-  const { isAuthenticated, isLoading, user } = useAuth();
-  const [search, setSearch] = useState("");
+  const [, setLocation] = useLocation();
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const queryClient = useQueryClient();
 
-  // Inject CSS to fix transparent dropdowns and other UI elements
   useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      /* Force opaque backgrounds for all UI components */
-      .select-content, .select-item, .select-trigger,
-      [data-radix-popper-content-wrapper],
-      .bg-red-50, .bg-blue-50, .bg-yellow-50, .bg-green-50,
-      .dark .bg-red-900\\/20, .dark .bg-blue-900\\/20, .dark .bg-yellow-900\\/20, .dark .bg-green-900\\/20,
-      .bg-white, .dark .bg-gray-800,
-      .bg-gray-50, .dark .bg-gray-900,
-      .bg-primary, .bg-secondary,
-      .bg-destructive, .bg-muted,
-      .bg-popover, .bg-card,
-      .bg-accent, .bg-accent-foreground {
-        background-color: var(--background) !important;
-        background: var(--background) !important;
-        opacity: 1 !important;
-      }
-      
-      /* Force opaque borders */
-      .border, .border-red-200, .border-blue-200, .border-yellow-200, .border-green-200,
-      .dark .border-red-800, .dark .border-blue-800, .dark .border-yellow-800, .dark .border-green-800,
-      .border-gray-300, .dark .border-gray-600 {
-        border-color: var(--border) !important;
-        opacity: 1 !important;
-      }
-      
-      /* Force opaque text */
-      .text-red-500, .text-blue-600, .text-yellow-600, .text-green-600,
-      .dark .text-red-400, .dark .text-blue-400, .dark .text-yellow-400, .dark .text-green-400 {
-        color: var(--foreground) !important;
-        opacity: 1 !important;
-      }
-      
-      /* Ensure modals and overlays are opaque */
-      .fixed.inset-0.bg-black.bg-opacity-50,
-      .bg-white, .dark .bg-gray-800,
-      .bg-gray-50, .dark .bg-gray-900 {
-        background-color: var(--background) !important;
-        background: var(--background) !important;
-        opacity: 1 !important;
-      }
-      
-      /* Fix any remaining transparent elements */
-      .bg-opacity-50, .bg-opacity-20, .bg-opacity-10 {
-        opacity: 1 !important;
-      }
-      
-      /* Ensure form elements have proper backgrounds */
-      input, select, textarea, button {
-        background-color: var(--background) !important;
-        background: var(--background) !important;
-        opacity: 1 !important;
-      }
-      
-      /* Fix modal backgrounds */
-      .modal, .dialog, .popover, .tooltip {
-        background-color: var(--background) !important;
-        background: var(--background) !important;
-        opacity: 1 !important;
-      }
-    `;
-    document.head.appendChild(style);
-    
-    return () => {
-      document.head.removeChild(style);
-    };
+    fetchTickets();
   }, []);
 
-  // Redirect to login if not authenticated
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
+    filterTickets();
+  }, [tickets, searchTerm, statusFilter, priorityFilter, categoryFilter]);
+
+  const fetchTickets = async () => {
+    try {
+      const response = await fetch('/api/tickets');
+      if (response.ok) {
+        const data = await response.json();
+        setTickets(data);
+      }
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+    } finally {
+      setIsLoading(false);
     }
-  }, [isAuthenticated, isLoading, toast]);
-
-  const queryParams = new URLSearchParams();
-  if (search) queryParams.append('search', search);
-  if (statusFilter !== 'all') queryParams.append('status', statusFilter);
-  if (priorityFilter !== 'all') queryParams.append('priority', priorityFilter);
-  if (categoryFilter !== 'all') queryParams.append('category', categoryFilter);
-
-  const { data: tickets, isLoading: ticketsLoading, error: ticketsError } = useQuery({
-    queryKey: ["/api/tickets", search, statusFilter, priorityFilter, categoryFilter],
-    queryFn: async () => {
-      const url = `/api/tickets${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      const response = await fetch(url, {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch tickets');
-      }
-      return response.json();
-    },
-    enabled: isAuthenticated,
-    retry: false,
-    refetchInterval: 5000, // Refresh every 5 seconds to show new tickets
-  });
-
-  const deleteTicketMutation = useMutation({
-    mutationFn: async (ticketId: string) => {
-      const response = await fetch(`/api/tickets/${ticketId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to delete ticket');
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Ticket deleted successfully",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to delete ticket",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleDeleteTicket = (ticketId: string) => {
-    deleteTicketMutation.mutate(ticketId);
   };
 
-  // Handle unauthorized errors
-  useEffect(() => {
-    if (ticketsError && isUnauthorizedError(ticketsError as Error)) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
+  const filterTickets = () => {
+    let filtered = tickets;
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(ticket =>
+        ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ticket.description.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-  }, [ticketsError, toast]);
+
+    // Status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(ticket => ticket.status === statusFilter);
+    }
+
+    // Priority filter
+    if (priorityFilter !== "all") {
+      filtered = filtered.filter(ticket => ticket.priority === priorityFilter);
+    }
+
+    // Category filter
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter(ticket => ticket.category === categoryFilter);
+    }
+
+    setFilteredTickets(filtered);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'new': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-200';
+      case 'in_progress': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200';
+      case 'pending': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-200';
+      case 'resolved': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200';
+      case 'closed': return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-200';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-200';
+      case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200';
+      case 'low': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-200';
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'hardware': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-200';
+      case 'software': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-200';
+      case 'network': return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-200';
+      case 'access': return 'bg-pink-100 text-pink-800 dark:bg-pink-900/20 dark:text-pink-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'new': return <PlusIcon className="h-4 w-4" />;
+      case 'in_progress': return <ClockIcon className="h-4 w-4" />;
+      case 'pending': return <AlertTriangleIcon className="h-4 w-4" />;
+      case 'resolved': return <CalendarIcon className="h-4 w-4" />;
+      case 'closed': return <CalendarIcon className="h-4 w-4" />;
+      default: return <TicketIcon className="h-4 w-4" />;
+    }
+  };
+
+  const getUserDisplayName = (user: any) => {
+    if (!user) return 'Unknown';
+    
+    // If user is a string (email or name)
+    if (typeof user === 'string') {
+      if (user.trim().length > 0) {
+        return user.split(" ")[0];
+      }
+      return 'Unknown';
+    }
+    
+    // If user is an object with firstName/lastName
+    if (user.firstName && user.lastName) {
+      return `${user.firstName} ${user.lastName}`;
+    }
+    
+    // If user is an object with just firstName
+    if (user.firstName) {
+      return user.firstName;
+    }
+    
+    // If user is an object with email
+    if (user.email && typeof user.email === 'string') {
+      return user.email.split('@')[0]; // Get username part of email
+    }
+    
+    return 'Unknown';
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setPriorityFilter("all");
+    setCategoryFilter("all");
+  };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"></div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       <Sidebar />
-      
-      <div className="flex-1 ml-64">
+      <div className="flex-1 flex flex-col overflow-hidden ml-64 relative z-20">
         <Header 
-          title="Tickets" 
-          subtitle="Manage and track all support tickets" 
+          title="Support Tickets" 
+          subtitle="Manage and track all support requests"
         />
         
-        <main className="p-6">
+        <main className="flex-1 overflow-y-auto p-6">
           {/* Filters and Search */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
-            <div className="flex flex-col md:flex-row gap-4 items-start md:items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Search tickets
-                </label>
+          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm mb-8">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-gray-900 dark:text-white flex items-center">
+                <FilterIcon className="h-5 w-5 mr-2 text-gray-600 dark:text-gray-400" />
+                Filters and Search
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="relative">
-                  <SearchIcon className="w-5 h-5 absolute left-3 top-3 text-gray-400" />
+                  <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 text-gray-400 -translate-y-1/2" />
                   <Input
-                    placeholder="Search by title or description..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search tickets..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
-                    data-testid="input-search-tickets"
                   />
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Status
-                  </label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger data-testid="select-status-filter" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
-                      <SelectValue placeholder="All statuses" />
-                    </SelectTrigger>
-                    <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
-                      <SelectItem value="all" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">All statuses</SelectItem>
-                      <SelectItem value="new" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">New</SelectItem>
-                      <SelectItem value="in_progress" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">In Progress</SelectItem>
-                      <SelectItem value="pending" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Pending</SelectItem>
-                      <SelectItem value="resolved" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Resolved</SelectItem>
-                      <SelectItem value="closed" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Priority
-                  </label>
-                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger data-testid="select-priority-filter" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
-                      <SelectValue placeholder="All priorities" />
-                    </SelectTrigger>
-                    <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
-                      <SelectItem value="all" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">All priorities</SelectItem>
-                      <SelectItem value="low" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Low</SelectItem>
-                      <SelectItem value="medium" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Medium</SelectItem>
-                      <SelectItem value="high" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">High</SelectItem>
-                      <SelectItem value="critical" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="new">New</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="pending">Pending</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="closed">Closed</option>
+                </select>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Category
-                  </label>
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger data-testid="select-category-filter" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
-                      <SelectValue placeholder="All categories" />
-                    </SelectTrigger>
-                    <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
-                      <SelectItem value="all" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">All categories</SelectItem>
-                      <SelectItem value="hardware" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Hardware</SelectItem>
-                      <SelectItem value="software" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Software</SelectItem>
-                      <SelectItem value="network" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Network</SelectItem>
-                      <SelectItem value="access" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Access</SelectItem>
-                      <SelectItem value="other" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <Link href="/create-ticket">
-                <Button data-testid="button-create-ticket" className="transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-lg">
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  Create Ticket
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Priorities</option>
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Categories</option>
+                  <option value="hardware">Hardware</option>
+                  <option value="software">Software</option>
+                  <option value="network">Network</option>
+                  <option value="access">Access</option>
+                </select>
+                
+                <Button
+                  variant="outline"
+                  onClick={clearFilters}
+                  className="transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md"
+                >
+                  Clear Filters
                 </Button>
-              </Link>
-            </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Results Summary */}
+          <div className="mb-6 flex items-center justify-between">
+            <p className="text-gray-600 dark:text-gray-400">
+              Showing {filteredTickets.length} of {tickets.length} tickets
+            </p>
           </div>
 
-          {/* Tickets List */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {ticketsLoading ? "Loading..." : `${tickets?.length || 0} tickets found`}
-                </h3>
-                <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-                  <FilterIcon className="w-4 h-4" />
-                  <span>Filtered results</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="p-6">
-              {ticketsLoading ? (
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+          {/* Tickets Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredTickets.map((ticket) => (
+              <Card 
+                key={ticket.id}
+                className="border-0 shadow-lg bg-white/80 backdrop-blur-sm hover:scale-105 transition-all duration-200 ease-in-out cursor-pointer"
+                onClick={() => setLocation(`/ticket/${ticket.id}`)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2 mb-2">
+                        {ticket.title}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3">
+                        {ticket.description}
+                      </p>
                     </div>
-                  ))}
-                </div>
-              ) : tickets && tickets.length > 0 ? (
-                <div className="space-y-4">
-                  {tickets.map((ticket: Ticket) => (
-                    <TicketCard 
-                      key={ticket.id} 
-                      ticket={ticket} 
-                      showDetails 
-                      onDelete={() => handleDeleteTicket(ticket.id)}
-                      currentUserId={user?.id}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FilterIcon className="w-8 h-8 text-gray-400" />
+                    <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center ml-3">
+                      {getStatusIcon(ticket.status)}
+                    </div>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    No tickets found
-                  </h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-6">
-                    {search || statusFilter || priorityFilter || categoryFilter
-                      ? "Try adjusting your search filters"
-                      : "Create your first ticket to get started"
-                    }
-                  </p>
-                  <Link href="/create-ticket">
-                    <Button data-testid="button-create-first-ticket">
-                      <PlusIcon className="w-4 h-4 mr-2" />
-                      Create Ticket
-                    </Button>
-                  </Link>
-                </div>
-              )}
-            </div>
+                </CardHeader>
+                
+                <CardContent className="pt-0">
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <Badge className={getStatusColor(ticket.status)}>
+                      {ticket.status.replace('_', ' ')}
+                    </Badge>
+                    <Badge className={getPriorityColor(ticket.priority)}>
+                      {ticket.priority}
+                    </Badge>
+                    <Badge className={getCategoryColor(ticket.category)}>
+                      {ticket.category}
+                    </Badge>
+                  </div>
+                  
+                  <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center space-x-2">
+                      <UserIcon className="h-4 w-4" />
+                      <span>Created by {getUserDisplayName(ticket.createdBy)}</span>
+                    </div>
+                    {ticket.assignedTo && (
+                      <div className="flex items-center space-x-2">
+                        <UserIcon className="h-4 w-4" />
+                        <span>Assigned to {getUserDisplayName(ticket.assignedTo)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center space-x-2">
+                      <CalendarIcon className="h-4 w-4" />
+                      <span>Created {new Date(ticket.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
+
+          {filteredTickets.length === 0 && (
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardContent className="text-center py-12">
+                <TicketIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  No tickets found
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {searchTerm || statusFilter !== "all" || priorityFilter !== "all" || categoryFilter !== "all"
+                    ? "Try adjusting your filters or search terms"
+                    : "Get started by creating your first ticket"}
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </main>
       </div>
     </div>

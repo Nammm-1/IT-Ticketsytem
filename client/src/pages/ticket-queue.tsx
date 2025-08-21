@@ -436,10 +436,10 @@ export default function TicketQueue() {
                 <p className="mt-2 text-gray-600 dark:text-gray-400">Loading tickets...</p>
               </div>
             ) : ticketsError ? (
-              <div className="text-center py-8">
-                <AlertTriangleIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                <p className="text-red-600 dark:text-red-400">Failed to load tickets</p>
-                <p className="text-sm text-gray-500 mt-2">{ticketsError.toString()}</p>
+              <div className="text-center py-8 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg p-6 shadow-sm">
+                <AlertTriangleIcon className="h-12 w-12 text-red-600 dark:text-red-400 mx-auto mb-4" />
+                <p className="text-red-800 dark:text-red-100 font-medium">Failed to load tickets</p>
+                <p className="text-sm text-red-700 dark:text-red-200 mt-2">{ticketsError.toString()}</p>
               </div>
             ) : tickets && tickets.length > 0 ? (
               tickets.map((ticket: Ticket) => (
