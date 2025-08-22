@@ -1,8 +1,8 @@
 #!/bin/bash
 
-echo "Running database migration to add password field..."
+echo "Running database migration to add reset token fields..."
 
-# Check if DATABASE_URL is set
+# Check if DATABASE_URL is not set
 if [ -z "$DATABASE_URL" ]; then
     echo "Error: DATABASE_URL environment variable is not set"
     echo "Please set it in your .env file or export it"
@@ -10,8 +10,7 @@ if [ -z "$DATABASE_URL" ]; then
 fi
 
 # Run the migration
-psql "$DATABASE_URL" -f migrations/add_password_field.sql
+psql "$DATABASE_URL" -f migrations/add_reset_token_fields.sql
 
 echo "Migration completed!"
-echo "Note: Existing users now have 'dev123' as their password"
-echo "Users can change their password through the application"
+echo "Note: Users can now reset their passwords securely via email links"

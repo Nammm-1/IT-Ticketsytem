@@ -34,6 +34,14 @@ export interface PasswordResetEmail {
   loginUrl: string;
 }
 
+export interface PasswordResetLink {
+  to: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  resetUrl: string;
+}
+
 export class EmailService {
   private transporter!: nodemailer.Transporter;
   private isConfigured: boolean = false;
@@ -154,7 +162,18 @@ export class EmailService {
   }
 
   async sendPasswordResetEmail(emailData: PasswordResetEmail): Promise<{ success: boolean; message: string; tempPassword?: string }> {
-    const tempPassword = this.generateSecurePassword();
+    // Debug: Log what password we received vs what we'll use
+    console.log('🔍 Email Service Debug:');
+    console.log('  - Received tempPassword:', emailData.tempPassword);
+    console.log('  - Will use password:', emailData.tempPassword || this.generateSecurePassword());
+    
+    // ALWAYS use the provided tempPassword - never generate a new one for password resets
+    if (!emailData.tempPassword) {
+      console.error('❌ No tempPassword provided to sendPasswordResetEmail!');
+      throw new Error('tempPassword is required for password reset emails');
+    }
+    
+    const tempPassword = emailData.tempPassword;
     
     const emailContent = this.createPasswordResetEmailTemplate({
       ...emailData,
@@ -162,7 +181,8 @@ export class EmailService {
     });
 
     try {
-      if (this.isConfigured) {
+      // TEMPORARILY FORCE CONSOLE FALLBACK FOR DEBUGGING
+      if (false && this.isConfigured) {
         // Send actual email
         await this.transporter.sendMail({
           from: `"IT Support System" <${process.env.SMTP_USER}>`,
@@ -176,7 +196,7 @@ export class EmailService {
         return {
           success: true,
           message: "Password reset email sent successfully",
-          tempPassword
+          tempPassword: emailData.tempPassword || tempPassword
         };
       } else {
         // Console fallback for development
@@ -189,7 +209,7 @@ export class EmailService {
         return {
           success: true,
           message: "Password reset with console notification (email service not configured)",
-          tempPassword
+          tempPassword: emailData.tempPassword || tempPassword
         };
       }
     } catch (error) {
@@ -200,6 +220,47 @@ export class EmailService {
         success: false,
         message: "Failed to send password reset email, but password was generated. Please share credentials manually.",
         tempPassword
+      };
+    }
+  }
+
+  async sendPasswordResetLink(emailData: PasswordResetLink): Promise<{ success: boolean; message: string }> {
+    const emailContent = this.createPasswordResetLinkTemplate(emailData);
+
+    try {
+      if (this.isConfigured) {
+        // Send actual email
+        await this.transporter.sendMail({
+          from: `"IT Support System" <${process.env.SMTP_USER}>`,
+          to: emailData.email,
+          subject: "Password Reset Link - IT Support System",
+          html: emailContent.html,
+          text: emailContent.text
+        });
+
+        console.log(`✅ Password reset link sent to ${emailData.email}`);
+        return {
+          success: true,
+          message: "Password reset link sent successfully"
+        };
+      } else {
+        // Console fallback for development
+        console.log('\n📧 === PASSWORD RESET LINK EMAIL (Console Fallback) ===');
+        console.log(`To: ${emailData.email}`);
+        console.log(`Subject: Password Reset Link - IT Support System`);
+        console.log(`\n${emailContent.text}`);
+        console.log('\n===============================================\n');
+
+        return {
+          success: true,
+          message: "Password reset link with console notification (email service not configured)"
+        };
+      }
+    } catch (error) {
+      console.error('❌ Failed to send password reset link email:', error);
+      return {
+        success: false,
+        message: "Failed to send password reset link email"
       };
     }
   }
@@ -457,6 +518,91 @@ Next Steps:
 4. Continue using the system as normal
 
 If you did not request this password reset, please contact your IT administrator immediately.
+
+This is an automated message from the IT Support System.
+Please do not reply to this email.
+    `;
+
+    return { html, text };
+  }
+
+  private createPasswordResetLinkTemplate(emailData: PasswordResetLink) {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Password Reset Link - IT Support System</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #dc2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8fafc; padding: 20px; border-radius: 0 0 8px 8px; }
+          .button { display: inline-block; background: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .warning { background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔐 Password Reset Request</h1>
+          </div>
+          
+          <div class="content">
+            <p>Hello ${emailData.firstName} ${emailData.lastName},</p>
+            
+            <p>You have requested to reset your password for the IT Support System. Click the button below to set a new password.</p>
+            
+            <div class="warning">
+              <h4>⚠️ Security Notice:</h4>
+              <p>This reset link is valid for 1 hour only. If you did not request this password reset, please ignore this email.</p>
+            </div>
+            
+            <a href="${emailData.resetUrl}" class="button">🔑 Reset Your Password</a>
+            
+            <p><strong>What happens next:</strong></p>
+            <ol>
+              <li>Click the button above to go to the password reset page</li>
+              <li>Enter your new password (minimum 8 characters)</li>
+              <li>Confirm your new password</li>
+              <li>You'll be redirected to login with your new password</li>
+            </ol>
+            
+            <p>If the button doesn't work, copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; background: #f1f5f9; padding: 10px; border-radius: 4px; font-family: monospace;">${emailData.resetUrl}</p>
+            
+            <div class="footer">
+              <p>This is an automated message from the IT Support System.</p>
+              <p>Please do not reply to this email.</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `
+Password Reset Link - IT Support System
+
+Hello ${emailData.firstName} ${emailData.lastName},
+
+You have requested to reset your password for the IT Support System. Use the link below to set a new password.
+
+🔑 Reset Your Password:
+${emailData.resetUrl}
+
+⚠️ Security Notice:
+This reset link is valid for 1 hour only. If you did not request this password reset, please ignore this email.
+
+What happens next:
+1. Click the link above to go to the password reset page
+2. Enter your new password (minimum 8 characters)
+3. Confirm your new password
+4. You'll be redirected to login with your new password
+
+If the link doesn't work, copy and paste it into your browser.
 
 This is an automated message from the IT Support System.
 Please do not reply to this email.

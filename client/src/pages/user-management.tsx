@@ -386,12 +386,19 @@ export default function UserManagement() {
   // Reset password mutation
   const resetPasswordMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const response = await fetch(`/api/users/${encodeURIComponent(userId)}/reset-password`, {
+      // Find the user to get their email
+      const user = users?.find(u => u.id === userId);
+      if (!user?.email) {
+        throw new Error('User email not found');
+      }
+      
+      const response = await fetch(`/api/users/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
+        body: JSON.stringify({ email: user.email }),
       });
       
       if (!response.ok) {
@@ -405,44 +412,43 @@ export default function UserManagement() {
       // Find the user to show their name in the success message
       const user = users?.find(u => u.id === userId);
       
-      if (data.emailResult?.success) {
+      if (data.success) {
         toast({
-          title: "✅ Password Reset Successful!",
+          title: "✅ Password Reset Complete!",
           description: (
             <div className="space-y-2">
-              <p>{data.emailResult.message}</p>
+              <p>{data.message}</p>
               <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
                 <p className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
-                  📧 Password Reset Email Sent
+                  🔑 Temporary Password Generated
                 </p>
                 <p className="text-xs text-green-700 dark:text-green-300">
-                  A password reset email has been sent to <strong>{user?.email}</strong>
+                  Password reset completed for <strong>{user?.email}</strong>
                 </p>
+                {data.tempPassword && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mt-2">
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                      📧 Temporary Password Sent
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      A new temporary password has been sent to the user's email.
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                      The user can change this password after logging in.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           ),
           duration: 8000,
         });
       } else {
-        // Email failed but password was reset
         toast({
-          title: "⚠️ Password Reset, Email Failed",
-          description: (
-            <div className="space-y-2">
-              <p>Password was reset successfully, but email notification failed.</p>
-              {data.emailResult?.tempPassword && (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
-                    🔑 New Temporary Password (Share Manually)
-                  </p>
-                  <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                    <strong>Password:</strong> <code className="bg-yellow-100 dark:bg-yellow-800 px-2 py-1 rounded">{data.emailResult.tempPassword}</code>
-                  </p>
-                </div>
-              )}
-            </div>
-          ),
-          duration: 10000,
+          title: "⚠️ Password Reset Failed",
+          description: data.message || "Failed to reset password",
+          variant: "destructive",
+          duration: 5000,
         });
       }
     },

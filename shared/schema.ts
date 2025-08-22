@@ -46,6 +46,9 @@ export const users = pgTable("users", {
   password: varchar("password"), // Store hashed passwords
   role: userRoleEnum('role').default('end_user').notNull(),
   is_active: integer('is_active').default(1).notNull(),
+  // Password reset fields
+  resetToken: varchar("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
   // User account settings
   phone: varchar("phone"),
   timezone: varchar("timezone").default('UTC'),

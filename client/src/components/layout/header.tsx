@@ -66,6 +66,21 @@ export default function Header({ title, subtitle }: HeaderProps) {
     setUnreadCount(0);
   };
 
+  const clearAllNotifications = async () => {
+    try {
+      const res = await fetch('/api/notifications/clear', { 
+        method: 'DELETE', 
+        credentials: 'include' 
+      });
+      if (res.ok) {
+        setNotifications([]);
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Failed to clear notifications:', error);
+    }
+  };
+
   return (
     <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-6 py-4">
       <div className="flex items-center justify-between">
@@ -108,7 +123,10 @@ export default function Header({ title, subtitle }: HeaderProps) {
               <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
                 <div className="px-3 py-2 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
                   <span className="text-sm font-medium">Notifications</span>
-                  <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-xs">Mark all read</Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-xs">Mark all read</Button>
+                    <Button variant="ghost" size="sm" onClick={clearAllNotifications} className="text-xs text-red-600 hover:text-red-700">Clear all</Button>
+                  </div>
                 </div>
                 <div className="py-1">
                   {loadingNotifs && (

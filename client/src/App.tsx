@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import ForgotPassword from "@/pages/forgot-password";
+
 import Dashboard from "@/pages/dashboard";
 import Tickets from "@/pages/tickets";
 import CreateTicket from "@/pages/create-ticket";
@@ -93,6 +94,7 @@ function Router() {
         <Route path="/" component={Landing} />
         <Route path="/login" component={Login} />
         <Route path="/forgot-password" component={ForgotPassword} />
+
         <Route component={NotFound} />
       </Switch>
     );

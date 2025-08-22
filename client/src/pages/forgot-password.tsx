@@ -30,8 +30,6 @@ export default function ForgotPassword() {
 
       if (response.ok) {
         setIsSubmitted(true);
-        const tempPassword = data.emailResult?.tempPassword || 'reset123';
-        alert(`Password reset successful! Your new temporary password is: ${tempPassword}\n\nPlease save this password and use it to log in.`);
       } else {
         alert(`Password reset failed: ${data.message || "Unknown error"}`);
       }
@@ -62,14 +60,15 @@ export default function ForgotPassword() {
               Bowie State University
             </CardTitle>
             <CardDescription className="text-gray-600 dark:text-gray-400">
-              Password Reset Successful! Check your email for the new temporary password.
+              Password Reset Complete! Check your email for your new temporary password.
             </CardDescription>
           </CardHeader>
           
           <CardContent className="space-y-4">
             <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-              <p>If you didn't receive an email, the temporary password was displayed above.</p>
-              <p className="mt-2">Please save this password and use it to log in.</p>
+              <p>Your password has been reset successfully.</p>
+              <p className="mt-2">Check your email for the new temporary password.</p>
+              <p className="mt-2">You can change this password to your preferred one after logging in.</p>
             </div>
             
             <div className="flex space-x-3">

@@ -25,6 +25,8 @@ import { eq, desc, and, or, sql, ilike, count } from "drizzle-orm";
 export interface IStorage {
   // User operations (mandatory for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByResetToken(token: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<UpsertUser>): Promise<User>;
   createUser(user: UpsertUser): Promise<User>;
@@ -99,6 +101,7 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   getUserNotifications(userId: string, onlyUnread?: boolean, limit?: number): Promise<Notification[]>;
   markNotificationRead(notificationId: string): Promise<void>;
+  clearUserNotifications(userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -111,6 +114,11 @@ export class DatabaseStorage implements IStorage {
   async getUserByEmail(email: string): Promise<User | undefined> {
     // Use case-insensitive email comparison
     const [user] = await db.select().from(users).where(sql`LOWER(${users.email}) = LOWER(${email})`);
+    return user;
+  }
+
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.resetToken, token));
     return user;
   }
 
@@ -632,6 +640,10 @@ export class DatabaseStorage implements IStorage {
 
   async markNotificationRead(notificationId: string): Promise<void> {
     await db.update(notifications).set({ isRead: 1 }).where(eq(notifications.id, notificationId));
+  }
+
+  async clearUserNotifications(userId: string): Promise<void> {
+    await db.delete(notifications).where(eq(notifications.userId, userId));
   }
 }
 

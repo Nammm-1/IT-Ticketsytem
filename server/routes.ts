@@ -716,6 +716,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/notifications/clear', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      await storage.clearUserNotifications(userId);
+      res.json({ success: true, message: 'All notifications cleared' });
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+      res.status(500).json({ message: 'Failed to clear notifications' });
+    }
+  });
+
   // User Management API
   app.get('/api/users', isAuthenticated, async (req: any, res) => {
     try {

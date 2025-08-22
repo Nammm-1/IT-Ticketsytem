@@ -2,6 +2,7 @@ import passport from "passport";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
+
 import { storage } from "./storage";
 import { DatabaseStorage, IStorage } from "./storage";
 import { emailService } from "./emailService";
@@ -1347,126 +1348,90 @@ export async function setupAuth(app: Express) {
       }
   });
 
-    // Reset password endpoint - accepts either user ID in path or email in body
-  app.post("/api/users/:userId/reset-password", async (req, res) => {
-      try {
-        const { userId } = req.params;
-
-        // Accept either a database user ID or an email address in the path param
-        // If it looks like an email (has an @), resolve by email; otherwise treat as ID
-        let user: any | undefined;
-        if (userId && userId.includes('@')) {
-          user = await storage.getUserByEmail(userId);
-        } else {
-          user = await storage.getUser(userId);
-        }
-        if (!user) {
-          return res.status(404).json({ message: "User not found" });
-        }
-        
-        // Generate new temporary password
-        const tempPassword = 'reset123'; // In production, generate a random secure password
-        const loginUrl = `${req.protocol}://${req.get('host')}/login`;
-        const emailResult = await emailService.sendPasswordResetEmail({
-          to: user.email || '',
-          firstName: user.firstName || '',
-          lastName: user.lastName || '',
-          email: user.email || '',
-          tempPassword: tempPassword,
-          loginUrl
-        });
-        
-        // Update the user's password in the database
-        await storage.updateUser(user.id, { password: tempPassword });
-        // In-app notification
-        try {
-          await storage.createNotification({
-            userId: user.id,
-            type: 'password_reset',
-            title: 'Password Reset',
-            message: 'Your password has been reset. Check your email for the temporary password.',
-            data: {},
-          } as any);
-        } catch (e) {
-          console.warn('Failed to create password reset notification:', e);
-        }
-        
-        // Return result
-        res.json({
-          success: true,
-          message: "Password reset email sent successfully",
-          emailResult: {
-            success: emailResult.success,
-            message: emailResult.message,
-            tempPassword: emailResult.tempPassword
-          }
-        });
-      } catch (error) {
-        console.error('Error resetting password:', error);
-        res.status(500).json({ message: "Failed to reset password" });
-      }
-  });
-
-    // New robust password reset endpoint - accepts email in JSON body
+  // Simple password reset endpoint - generates temporary password and sends it via email
   app.post("/api/users/reset-password", async (req, res) => {
-      try {
-        const { email } = req.body;
-        
-        if (!email) {
-          return res.status(400).json({ message: "Email is required" });
-        }
-        
-        // Get user from database by email
-        const user = await storage.getUserByEmail(email);
-        if (!user) {
-          return res.status(404).json({ message: "User not found" });
-        }
-        
-        // Generate new temporary password
-        const tempPassword = 'reset123'; // In production, generate a random secure password
-        const loginUrl = `${req.protocol}://${req.get('host')}/login`;
-        const emailResult = await emailService.sendPasswordResetEmail({
-          to: user.email || '',
-          firstName: user.firstName || '',
-          lastName: user.lastName || '',
-          email: user.email || '',
-          tempPassword: tempPassword,
-          loginUrl
-        });
-        
-        // Update the user's password in the database
-        await storage.updateUser(user.id, { password: tempPassword });
-        
-        // In-app notification
-        try {
-          await storage.createNotification({
-            userId: user.id,
-            type: 'password_reset',
-            title: 'Password Reset',
-            message: 'Your password has been reset. Check your email for the temporary password.',
-            data: {},
-          } as any);
-        } catch (e) {
-          console.warn('Failed to create password reset notification:', e);
-        }
-        
-        // Return result
-        res.json({
-          success: true,
-          message: "Password reset email sent successfully",
-          emailResult: {
-            success: emailResult.success,
-            message: emailResult.message,
-            tempPassword: emailResult.tempPassword
-          }
-        });
-      } catch (error) {
-        console.error('Error resetting password:', error);
-        res.status(500).json({ message: "Failed to reset password" });
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
       }
+      
+      // Get user from database by email
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Generate a simple temporary password (8 characters)
+      const tempPassword = Math.random().toString(36).substring(2, 10);
+      
+      // Update user's password in database
+      console.log('🔐 About to update user with temporary password:', { 
+        userId: user.id, 
+        tempPassword: tempPassword
+      });
+      
+      try {
+        await storage.updateUser(user.id, { password: tempPassword });
+        console.log('✅ Successfully updated user with temporary password');
+      } catch (updateError) {
+        console.error('❌ Error updating user password:', updateError);
+        throw updateError;
+      }
+      
+      // Send email with temporary password
+      console.log('🔍 Server Debug - About to send email:');
+      console.log('  - Generated tempPassword:', tempPassword);
+      console.log('  - User email:', user.email);
+      console.log('  - About to call emailService.sendPasswordResetEmail with tempPassword:', tempPassword);
+      
+      const emailResult = await emailService.sendPasswordResetEmail({
+        to: user.email || '',
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        tempPassword: tempPassword, // Pass the same password that was stored
+        loginUrl: `${req.protocol}://${req.get('host')}/login`
+      });
+      
+      console.log('🔍 Server Debug - Email result:', emailResult);
+      console.log('🔍 Server Debug - Email result.tempPassword:', emailResult.tempPassword);
+      
+      // In-app notification
+      try {
+        await storage.createNotification({
+          userId: user.id,
+          type: 'password_reset',
+          title: 'Password Reset Completed',
+          message: 'Your password has been reset. Check your email for the new temporary password.',
+          data: {},
+        } as any);
+      } catch (e) {
+        console.warn('Failed to create password reset notification:', e);
+      }
+      
+      // Return success with temporary password info
+      res.json({
+        success: true,
+        message: "Password reset successful. Temporary password sent to your email.",
+        tempPassword: tempPassword, // Include temp password for admin display
+        emailResult: {
+          success: emailResult.success,
+          message: emailResult.message
+        }
+      });
+    } catch (error) {
+      console.error('Error requesting password reset:', error);
+      res.status(500).json({ message: "Failed to request password reset" });
+    }
   });
 
-    // Test email connection endpoint
+
+
+
+
+  // Test email connection endpoint
   app.post("/api/test-email", async (req, res) => {
       try {
         const testResult = await emailService.testConnection();
