@@ -62,6 +62,9 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Contact preference enum
+export const contactPreferenceEnum = pgEnum('contact_preference', ['email', 'phone', 'both']);
+
 // Tickets table
 export const tickets = pgTable("tickets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -72,6 +75,11 @@ export const tickets = pgTable("tickets", {
   status: ticketStatusEnum('status').default('new').notNull(),
   createdById: varchar("created_by_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   assignedToId: varchar("assigned_to_id").references(() => users.id, { onDelete: 'set null' }),
+  // Contact Information Fields
+  contactPhone: varchar("contact_phone", { length: 20 }),
+  contactPreference: contactPreferenceEnum('contact_preference').default('email'),
+  bestTimeToContact: varchar("best_time_to_contact", { length: 100 }),
+  location: varchar("location", { length: 100 }),
   resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

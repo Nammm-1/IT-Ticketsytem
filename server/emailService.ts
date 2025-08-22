@@ -11,6 +11,11 @@ export interface EmailConfig {
   connectionTimeout?: number;
   greetingTimeout?: number;
   socketTimeout?: number;
+  requireTLS?: boolean;
+  ignoreTLS?: boolean;
+  pool?: boolean;
+  maxConnections?: number;
+  maxMessages?: number;
   tls?: {
     rejectUnauthorized: boolean;
   };
@@ -55,9 +60,15 @@ export class EmailService {
     const emailConfig = this.getEmailConfig();
     
     if (emailConfig) {
-      this.transporter = nodemailer.createTransport(emailConfig);
-      this.isConfigured = true;
-      console.log('✅ Email service configured successfully');
+      try {
+        this.transporter = nodemailer.createTransport(emailConfig);
+        this.isConfigured = true;
+        console.log('✅ Email service configured successfully');
+      } catch (error) {
+        console.log('⚠️ Email service configuration failed:', error instanceof Error ? error.message : String(error));
+        console.log('⚠️ Falling back to console output');
+        this.isConfigured = false;
+      }
     } else {
       console.log('⚠️ Email service not configured - using console fallback');
       this.isConfigured = false;
@@ -72,20 +83,36 @@ export class EmailService {
     const pass = process.env.SMTP_PASS;
 
     if (host && port && user && pass) {
-      return {
-        host,
-        port: parseInt(port),
-        secure: port === '465', // Use SSL for port 465
-        auth: { user, pass },
-        // Add connection timeout and retry settings for Gmail
-        connectionTimeout: 60000, // 60 seconds
-        greetingTimeout: 30000,   // 30 seconds
-        socketTimeout: 60000,     // 60 seconds
-        // Gmail specific settings
-        tls: {
-          rejectUnauthorized: false
+      // Try different Gmail configurations
+      const configs = [
+        // Configuration 1: Standard Gmail SMTP
+        {
+          host,
+          port: parseInt(port),
+          secure: false,
+          auth: { user, pass },
+          requireTLS: true,
+          ignoreTLS: false,
+          connectionTimeout: 30000,
+          greetingTimeout: 30000,
+          socketTimeout: 30000,
+          tls: { rejectUnauthorized: false }
+        },
+        // Configuration 2: Gmail with SSL (port 465)
+        {
+          host,
+          port: 465,
+          secure: true,
+          auth: { user, pass },
+          connectionTimeout: 30000,
+          greetingTimeout: 30000,
+          socketTimeout: 30000,
+          tls: { rejectUnauthorized: false }
         }
-      };
+      ];
+
+      // Try the SSL configuration (port 465) which sometimes works better
+      return configs[1];
     }
 
     return null;
@@ -181,8 +208,7 @@ export class EmailService {
     });
 
     try {
-      // TEMPORARILY FORCE CONSOLE FALLBACK FOR DEBUGGING
-      if (false && this.isConfigured) {
+      if (this.isConfigured) {
         // Send actual email
         await this.transporter.sendMail({
           from: `"IT Support System" <${process.env.SMTP_USER}>`,

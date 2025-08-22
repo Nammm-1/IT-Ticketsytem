@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
+import AttachmentViewer from "@/components/tickets/attachment-viewer";
 
 interface TicketAttachment {
   id: string;
@@ -75,6 +76,11 @@ interface Ticket {
     lastName?: string;
     email?: string;
   };
+  // Contact Information
+  contactPhone?: string;
+  contactPreference?: string;
+  bestTimeToContact?: string;
+  location?: string;
   comments: TicketComment[];
   attachments: TicketAttachment[];
 }
@@ -89,6 +95,8 @@ export default function TicketDetails() {
   const [isInternalComment, setIsInternalComment] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [viewingAttachment, setViewingAttachment] = useState<TicketAttachment | null>(null);
+  const [isAttachmentViewerOpen, setIsAttachmentViewerOpen] = useState(false);
 
   // Inject CSS to fix transparent dropdowns and other UI elements
   useEffect(() => {
@@ -408,6 +416,16 @@ export default function TicketDetails() {
     }
   };
 
+  const handleViewAttachment = (attachment: TicketAttachment) => {
+    setViewingAttachment(attachment);
+    setIsAttachmentViewerOpen(true);
+  };
+
+  const handleCloseAttachmentViewer = () => {
+    setIsAttachmentViewerOpen(false);
+    setViewingAttachment(null);
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -570,6 +588,42 @@ export default function TicketDetails() {
                   <p className="text-gray-600 dark:text-gray-300 mb-4">
                     {ticket?.description}
                   </p>
+                  
+                  {/* Contact Information */}
+                  {(ticket?.contactPhone || ticket?.contactPreference || ticket?.bestTimeToContact || ticket?.location) && (
+                    <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-3 flex items-center">
+                        <UserIcon className="w-5 h-5 mr-2" />
+                        Contact Information
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {ticket?.contactPhone && (
+                          <div>
+                            <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Phone:</span>
+                            <span className="ml-2 text-blue-700 dark:text-blue-300">{ticket.contactPhone}</span>
+                          </div>
+                        )}
+                        {ticket?.contactPreference && (
+                          <div>
+                            <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Preferred Contact:</span>
+                            <span className="ml-2 text-blue-700 dark:text-blue-300 capitalize">{ticket.contactPreference}</span>
+                          </div>
+                        )}
+                        {ticket?.bestTimeToContact && (
+                          <div>
+                            <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Best Time:</span>
+                            <span className="ml-2 text-blue-700 dark:text-blue-300">{ticket.bestTimeToContact}</span>
+                          </div>
+                        )}
+                        {ticket?.location && (
+                          <div>
+                            <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Location:</span>
+                            <span className="ml-2 text-blue-700 dark:text-blue-300">{ticket.location}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
@@ -767,7 +821,11 @@ export default function TicketDetails() {
                           <div className="flex items-center space-x-2 min-w-0">
                             <PaperclipIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
                             <div className="min-w-0">
-                              <p className="text-sm text-gray-900 dark:text-white truncate">
+                              <p 
+                                className="text-sm text-blue-600 dark:text-blue-400 truncate cursor-pointer hover:underline"
+                                onClick={() => handleViewAttachment(attachment)}
+                                title="Click to view attachment"
+                              >
                                 {attachment.fileName}
                               </p>
                               <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -844,6 +902,14 @@ export default function TicketDetails() {
           </div>
         </main>
       </div>
+      
+      {/* Attachment Viewer Modal */}
+      <AttachmentViewer
+        isOpen={isAttachmentViewerOpen}
+        onClose={handleCloseAttachmentViewer}
+        attachment={viewingAttachment}
+        ticketId={ticketId}
+      />
     </div>
   );
 }

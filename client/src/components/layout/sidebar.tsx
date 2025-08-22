@@ -160,8 +160,8 @@ export default function Sidebar() {
             </Button>
           </Link>
           
-          {/* Only show Create Ticket for non-admin users */}
-          {user?.role && user.role !== 'admin' && (
+          {/* Only show Create Ticket for end users (not IT staff, managers, or admins) */}
+          {user?.role === 'end_user' && (
             <Link href="/create-ticket">
               <Button
                 variant="ghost"
@@ -208,7 +208,7 @@ export default function Sidebar() {
             </Button>
           </Link>
 
-          {user?.role && ['it_staff', 'manager', 'admin'].includes(user.role) && (
+          {user?.role && ['manager', 'admin'].includes(user.role) && (
             <Link href="/reports">
               <Button
                 variant="ghost"
@@ -246,6 +246,18 @@ export default function Sidebar() {
                 </Button>
               </Link>
               
+
+            </div>
+          </div>
+        )}
+
+        {/* Management Tools - Only for managers and admins */}
+        {user?.role && ['manager', 'admin'].includes(user.role) && (
+          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <h3 className="px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+              Management Tools
+            </h3>
+            <div className="space-y-2">
               <Link href="/team-workload">
                 <Button
                   variant="ghost"

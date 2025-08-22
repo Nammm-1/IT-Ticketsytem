@@ -33,6 +33,11 @@ export interface Ticket {
     email?: string;
     role?: string;
   };
+  // Contact Information
+  contactPhone?: string;
+  contactPreference?: string;
+  bestTimeToContact?: string;
+  location?: string;
   comments: Comment[];
   attachments: Attachment[];
 }

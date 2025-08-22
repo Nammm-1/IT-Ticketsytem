@@ -26,6 +26,9 @@ export default function CreateTicket() {
     description: "",
     category: "",
     priority: "",
+    contactPhone: "",
+    contactPreference: "email",
+    location: "",
   });
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -106,6 +109,9 @@ export default function CreateTicket() {
         description: ticketData.description,
         category: ticketData.category,
         priority: ticketData.priority,
+        contactPhone: ticketData.contactPhone,
+        contactPreference: ticketData.contactPreference,
+        location: ticketData.location,
       });
       
       const ticket = await response.json();
@@ -313,6 +319,62 @@ export default function CreateTicket() {
                       className="resize-none"
                       data-testid="textarea-ticket-description"
                     />
+                  </div>
+
+                  {/* Contact Information Section */}
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                      Contact Information
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      Help IT support reach you for additional information or updates
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Phone Number / Email
+                        </label>
+                        <Input
+                          type="tel"
+                          placeholder="+1 (555) 123-4567 or email@example.com"
+                          value={formData.contactPhone}
+                          onChange={(e) => handleInputChange("contactPhone", e.target.value)}
+                          data-testid="input-contact-phone"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Preferred Contact Method
+                        </label>
+                        <Select value={formData.contactPreference} onValueChange={(value) => handleInputChange("contactPreference", value)}>
+                          <SelectTrigger data-testid="select-contact-preference" className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 !text-gray-900 dark:!text-white shadow-sm">
+                            <SelectValue placeholder="Select preference" />
+                          </SelectTrigger>
+                          <SelectContent className="!bg-white dark:!bg-gray-800 !border-gray-300 dark:!border-gray-600 shadow-xl z-50">
+                            <SelectItem value="email" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Email</SelectItem>
+                            <SelectItem value="phone" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Phone</SelectItem>
+                            <SelectItem value="both" className="!bg-white dark:!bg-gray-800 hover:!bg-gray-100 dark:hover:!bg-gray-700 !text-gray-900 dark:!text-white cursor-pointer">Both</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Location/Department
+                        </label>
+                        <Input
+                          type="text"
+                          placeholder="e.g., 3rd Floor, Marketing Dept, Remote"
+                          value={formData.location}
+                          onChange={(e) => handleInputChange("location", e.target.value)}
+                          data-testid="input-location"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div>

@@ -68,6 +68,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth middleware
   await setupAuth(app);
+
+  // Test email service endpoint
+  app.get('/api/test/email', async (req, res) => {
+    try {
+      console.log('🧪 Testing email service configuration...');
+      console.log('SMTP_HOST:', process.env.SMTP_HOST);
+      console.log('SMTP_PORT:', process.env.SMTP_PORT);
+      console.log('SMTP_USER:', process.env.SMTP_USER);
+      console.log('SMTP_PASS:', process.env.SMTP_PASS ? '***SET***' : 'NOT SET');
+      
+      // Test the transporter
+      const transporter = (emailService as any).transporter;
+      if (transporter) {
+        console.log('✅ Transporter exists');
+        // Try to verify the connection
+        await transporter.verify();
+        console.log('✅ SMTP connection verified successfully');
+        res.json({ 
+          success: true, 
+          message: 'Email service is working correctly',
+          config: {
+            host: process.env.SMTP_HOST,
+            port: process.env.SMTP_PORT,
+            user: process.env.SMTP_USER,
+            passSet: !!process.env.SMTP_PASS
+          }
+        });
+      } else {
+        console.log('❌ No transporter found');
+        res.status(500).json({ 
+          success: false, 
+          message: 'Email service not configured' 
+        });
+      }
+    } catch (error) {
+      console.error('❌ Email service test failed:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Email service test failed', 
+        error: error.message 
+      });
+    }
+  });
   // Realtime events stream (SSE)
   app.get('/api/events', isAuthenticated, (req: any, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -114,52 +157,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ticket = await storage.createTicket(ticketData);
       // Broadcast ticket created
       sseBroadcast({ type: 'ticket_created', ticketId: ticket.id });
-      // Notify creator
+      
+      // Notify all IT staff (email + in-app), so anyone can pick it up
       try {
-        await storage.createNotification({
-          userId,
-          type: 'ticket_created',
-          title: 'Ticket Created',
-          message: `Your ticket "${ticket.title}" was created successfully`,
-          data: { ticketId: ticket.id },
-        } as any);
-        sseBroadcast({ type: 'notification', userId, ticketId: ticket.id });
-        // Email creator
-        const creator = await storage.getUser(userId);
-        if (creator?.email) {
-          const ticketUrl = `${req.protocol}://${req.get('host')}/ticket/${ticket.id}`;
-          await emailService.sendTicketCreatedEmail({
-            to: creator.email,
-            ticketTitle: ticket.title,
-            ticketId: ticket.id,
-            ticketUrl,
-          });
-        }
-        // Notify all IT staff (email + in-app), so anyone can pick it up
-        try {
-          const allUsers = await storage.getAllUsers();
-          const itStaff = allUsers.filter(u => u.role === 'it_staff' && u.email);
-          const ticketUrlForStaff = `${req.protocol}://${req.get('host')}/ticket/${ticket.id}`;
-          for (const staff of itStaff) {
-            if (staff.id !== userId) {
-              await storage.createNotification({
-                userId: staff.id,
-                type: 'ticket_new_unassigned',
-                title: 'New Ticket Submitted',
-                message: `New ticket "${ticket.title}" requires triage`,
-                data: { ticketId: ticket.id },
-              } as any);
-              sseBroadcast({ type: 'notification', userId: staff.id, ticketId: ticket.id });
-              await emailService.sendTicketCreatedEmail({
-                to: staff.email!,
-                ticketTitle: ticket.title,
-                ticketId: ticket.id,
-                ticketUrl: ticketUrlForStaff,
-              });
-            }
+        const allUsers = await storage.getAllUsers();
+        const itStaff = allUsers.filter(u => u.role === 'it_staff' && u.email);
+        const ticketUrlForStaff = `${req.protocol}://${req.get('host')}/ticket/${ticket.id}`;
+        for (const staff of itStaff) {
+          if (staff.id !== userId) {
+            await storage.createNotification({
+              userId: staff.id,
+              type: 'ticket_new_unassigned',
+              title: 'New Ticket Submitted',
+              message: `New ticket "${ticket.title}" requires triage`,
+              data: { ticketId: ticket.id },
+            } as any);
+            sseBroadcast({ type: 'notification', userId: staff.id, ticketId: ticket.id });
+            await emailService.sendTicketCreatedEmail({
+              to: staff.email!,
+              ticketTitle: ticket.title,
+              ticketId: ticket.id,
+              ticketUrl: ticketUrlForStaff,
+            });
           }
-        } catch (e) { console.warn('Notify IT staff failed:', e); }
-      } catch (e) { console.warn('Notif ticket_created failed:', e); }
+        }
+      } catch (e) { console.warn('Notify IT staff failed:', e); }
       res.json(ticket);
     } catch (error) {
       console.error("Error creating ticket:", error);
@@ -422,8 +444,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ticket not found" });
       }
       
-      // Check permissions
-      if (ticket.createdById !== userId && !['it_staff', 'manager', 'admin'].includes(ticket.assignedTo?.role || '')) {
+      // Check permissions - allow ticket creator, assigned staff, or any admin/IT staff
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const hasAccess = ticket.createdById === userId || 
+                       ticket.assignedToId === userId ||
+                       ['it_staff', 'manager', 'admin'].includes(user.role);
+      
+      if (!hasAccess) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -465,8 +496,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ticket not found" });
       }
       
-      // Check permissions
-      if (ticket.createdById !== userId && !['it_staff', 'manager', 'admin'].includes(ticket.assignedTo?.role || '')) {
+      // Check permissions - allow ticket creator, assigned staff, or any admin/IT staff
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const hasAccess = ticket.createdById === userId || 
+                       ticket.assignedToId === userId ||
+                       ['it_staff', 'manager', 'admin'].includes(user.role);
+      
+      if (!hasAccess) {
         return res.status(403).json({ message: "Access denied" });
       }
       
@@ -491,6 +531,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Inline viewing endpoint for attachments (no download)
+  app.get('/api/tickets/:id/attachments/:attachmentId/view', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const ticketId = req.params.id;
+      const attachmentId = req.params.attachmentId;
+      
+      // Check if ticket exists
+      const ticket = await storage.getTicket(ticketId);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+      
+      // Check permissions - allow ticket creator, assigned staff, or any admin/IT staff
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const hasAccess = ticket.createdById === userId || 
+                       ticket.assignedToId === userId ||
+                       ['it_staff', 'manager', 'admin'].includes(user.role);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Get attachment
+      const attachment = await storage.getAttachment(attachmentId);
+      if (!attachment || attachment.ticketId !== ticketId) {
+        return res.status(404).json({ message: "Attachment not found" });
+      }
+      
+      // Check if file exists
+      if (!fs.existsSync(attachment.filePath)) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      
+      // Set headers for inline viewing (no download)
+      res.setHeader('Content-Type', attachment.mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${attachment.fileName}"`);
+      res.sendFile(attachment.filePath);
+    } catch (error) {
+      console.error("Error viewing attachment:", error);
+      res.status(500).json({ message: "Failed to view attachment" });
+    }
+  });
+
   app.delete('/api/tickets/:id/attachments/:attachmentId', isAuthenticated, async (req: any, res) => {
     try {
       const userId = getUserId(req);
@@ -503,8 +591,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ticket not found" });
       }
       
-      // Check permissions
-      if (ticket.createdById !== userId && !['it_staff', 'manager', 'admin'].includes(ticket.assignedTo?.role || '')) {
+      // Check permissions - allow ticket creator, assigned staff, or any admin/IT staff
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      const hasAccess = ticket.createdById === userId || 
+                       ticket.assignedToId === userId ||
+                       ['it_staff', 'manager', 'admin'].includes(user.role);
+      
+      if (!hasAccess) {
         return res.status(403).json({ message: "Access denied" });
       }
       

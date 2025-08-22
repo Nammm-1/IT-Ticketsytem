@@ -179,13 +179,13 @@ export default function TicketQueue() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ ticketId, status }: { ticketId: string; status: string }) => {
+    mutationFn: async ({ ticketId, status, assignedToId }: { ticketId: string; status: string; assignedToId?: string }) => {
       const response = await fetch(`/api/tickets/${ticketId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...(assignedToId && { assignedToId }) }),
         credentials: 'include',
       });
       if (!response.ok) {
@@ -193,11 +193,18 @@ export default function TicketQueue() {
       }
       return response.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Ticket status updated successfully",
-      });
+    onSuccess: (data, variables) => {
+      if (variables.assignedToId) {
+        toast({
+          title: "Success",
+          description: "Ticket assigned to you and status updated to In Progress",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Ticket status updated successfully",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
     },
     onError: (error) => {
@@ -215,6 +222,15 @@ export default function TicketQueue() {
 
   const handleUpdateStatus = (ticketId: string, status: string) => {
     updateStatusMutation.mutate({ ticketId, status });
+  };
+
+  const handleStartWorking = (ticketId: string) => {
+    // Update both status and assign to current user
+    updateStatusMutation.mutate({ 
+      ticketId, 
+      status: 'in_progress',
+      assignedToId: user?.id 
+    });
   };
 
   const getPriorityColor = (priority: string) => {
@@ -511,6 +527,42 @@ export default function TicketQueue() {
                     <p className="text-gray-700 dark:text-gray-300 mb-4 line-clamp-2">
                       {ticket.description}
                     </p>
+                    
+                    {/* Contact Information */}
+                    {(ticket.contactPhone || ticket.contactPreference || ticket.bestTimeToContact || ticket.location) && (
+                      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center mb-2">
+                          <UserIcon className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2" />
+                          <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Contact Info</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                          {ticket.contactPhone && (
+                            <div>
+                              <span className="font-medium text-blue-700 dark:text-blue-300">📞</span>
+                              <span className="ml-1 text-blue-600 dark:text-blue-400">{ticket.contactPhone}</span>
+                            </div>
+                          )}
+                          {ticket.contactPreference && (
+                            <div>
+                              <span className="font-medium text-blue-700 dark:text-blue-300">📧</span>
+                              <span className="ml-1 text-blue-600 dark:text-blue-400 capitalize">{ticket.contactPreference}</span>
+                            </div>
+                          )}
+                          {ticket.bestTimeToContact && (
+                            <div>
+                              <span className="font-medium text-blue-700 dark:text-blue-300">⏰</span>
+                              <span className="ml-1 text-blue-600 dark:text-blue-400">{ticket.bestTimeToContact}</span>
+                            </div>
+                          )}
+                          {ticket.location && (
+                            <div>
+                              <span className="font-medium text-blue-700 dark:text-blue-300">📍</span>
+                              <span className="ml-1 text-blue-600 dark:text-blue-400">{ticket.location}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -524,7 +576,7 @@ export default function TicketQueue() {
                         {ticket.status === 'new' && (
                           <Button
                             size="sm"
-                            onClick={() => handleUpdateStatus(ticket.id, 'in_progress')}
+                            onClick={() => handleStartWorking(ticket.id)}
                             disabled={updateStatusMutation.isPending}
                             data-testid={`button-start-ticket-${ticket.id}`}
                           >
