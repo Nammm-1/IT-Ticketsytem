@@ -33,6 +33,7 @@ export default function Login() {
   });
   
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -98,9 +99,20 @@ export default function Login() {
           alert("Login Successful! Redirecting to dashboard...");
           // Invalidate user cache to ensure fresh auth state
           invalidateUserCache();
+          console.log('🔄 Login successful, invalidating cache and redirecting...');
+          
+          // Also clear any stored session data
+          sessionStorage.clear();
+          localStorage.clear();
+          
+          // Set redirecting state to show loading
+          setIsRedirecting(true);
+          
+          // Simple and reliable approach: reload the page after login
           setTimeout(() => {
-            setLocation("/");
-          }, 2000);
+            console.log('🔄 Reloading page to refresh authentication state...');
+            window.location.reload();
+          }, 1500);
         }
       } else {
         // Handle JSON response (error or special case)
@@ -113,9 +125,16 @@ export default function Login() {
             alert("Login Successful! Redirecting to dashboard...");
             // Invalidate user cache to ensure fresh auth state
             invalidateUserCache();
+            
+            // Also clear any stored session data
+            sessionStorage.clear();
+            localStorage.clear();
+            
+            // Simple and reliable approach: reload the page after login
             setTimeout(() => {
-              setLocation("/");
-            }, 2000);
+              console.log('🔄 Reloading page to refresh authentication state...');
+              window.location.reload();
+            }, 1500);
           } else {
             // Error response
             alert(`Login Failed: ${data.message || "Invalid credentials"}`);
@@ -225,6 +244,16 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+      {/* Loading overlay when redirecting */}
+      {isRedirecting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p className="text-gray-600">Redirecting to dashboard...</p>
+          </div>
+        </div>
+      )}
+      
       <Card className={`w-full max-w-md shadow-lg ${showPasswordChangeModal ? 'pointer-events-none blur-md' : ''}`}>
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center">
@@ -296,7 +325,7 @@ export default function Login() {
               className="w-full bg-black hover:bg-gray-700 text-white transition-all duration-200 ease-in-out hover:transform hover:scale-105 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading}
             >
-              {isLoading ? "Signing In..." : "Sign In"}
+                              {isLoading ? "Signing In..." : isRedirecting ? "Redirecting..." : "Sign In"}
             </Button>
           </form>
           

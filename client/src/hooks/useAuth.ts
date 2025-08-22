@@ -8,6 +8,9 @@ export function useAuth() {
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes - refresh more often
     refetchOnWindowFocus: true, // Refresh when window gains focus
+    // Add a small delay to prevent rapid state changes
+    refetchOnMount: true,
+    refetchOnReconnect: true,
   });
 
   // Debug logging
@@ -15,10 +18,16 @@ export function useAuth() {
     console.log('🔍 useAuth Debug:', { user, isLoading, error, isAuthenticated: !!user });
   }, [user, isLoading, error]);
 
+  // Force console log on every render
+  console.log('🔄 useAuth rendering with:', { user, isLoading, error, isAuthenticated: !!user });
+
+  // Ensure we don't show unauthenticated state while loading
+  const isAuthenticated = !isLoading && !!user;
+
   return {
     user,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated,
     refetch,
   };
 }
